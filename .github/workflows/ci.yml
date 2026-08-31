@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-race:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: keyflow
+          POSTGRES_PASSWORD: keyflow
+          POSTGRES_DB: keyflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U keyflow -d keyflow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Типы
+        run: |
+          npm run typecheck -w server
+          npm run typecheck -w providers
+          npm run typecheck -w web
+
+      - name: Сборка фронта
+        run: npm run build -w web
+
+      # Тесты сами поднимают API и заглушки поставщиков и создают базу
+      # keyflow_test — снаружи нужен только живой Postgres.
+      - name: Тесты гонок
+        run: npm run test:races
+        env:
+          TEST_PG_URL: postgres://keyflow:keyflow@localhost:5432

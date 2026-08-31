@@ -1,7 +1,12 @@
 /** Единые адреса и параметры для тестового прогона. */
 export const TEST_DB_NAME = 'keyflow_test';
-export const ADMIN_DB_URL = 'postgres://keyflow:keyflow@localhost:5433/postgres';
-export const TEST_DB_URL = `postgres://keyflow:keyflow@localhost:5433/${TEST_DB_NAME}`;
+
+// Локально Postgres поднимается на 5433 (5432 часто уже занят), в CI — на 5432.
+// Базу тесты создают сами, поэтому в переменной только адрес сервера.
+const PG_SERVER = process.env.TEST_PG_URL ?? 'postgres://keyflow:keyflow@localhost:5433';
+
+export const ADMIN_DB_URL = `${PG_SERVER}/postgres`;
+export const TEST_DB_URL = `${PG_SERVER}/${TEST_DB_NAME}`;
 
 export const API_PORT = 3100;
 export const PROVIDERS_PORT = 4101;
