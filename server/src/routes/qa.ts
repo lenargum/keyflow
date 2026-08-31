@@ -1,6 +1,7 @@
 import { customAlphabet } from 'nanoid';
 import type { FastifyInstance } from 'fastify';
 import { config } from '../config.js';
+import { createOrder, OrderError } from '../services/orders.js';
 
 const nano = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
 
@@ -18,6 +19,23 @@ type PayBody = {
  * которым ходит платёжка.
  */
 export async function qaRoutes(app: FastifyInstance): Promise<void> {
+  /**
+   * Создать заказ с заранее известным id. Нужно ровно для одного сценария:
+   * прислать вебхук ДО того, как заказ появится в базе. Публичный
+   * POST /api/orders id не принимает — клиенту такое доверять нельзя.
+   */
+  app.post<{ Body: { sku?: string; order_id?: string } }>('/api/qa/orders', async (req, reply) => {
+    const sku = req.body?.sku;
+    if (!sku) return reply.code(400).send({ error: 'sku_required' });
+    try {
+      const order = await createOrder(sku, req.body?.order_id);
+      return reply.code(201).send({ order });
+    } catch (err) {
+      if (err instanceof OrderError) return reply.code(err.statusCode).send({ error: err.reason });
+      throw err;
+    }
+  });
+
   app.post<{ Body: PayBody }>('/api/qa/pay', async (req, reply) => {
     const orderId = req.body?.order_id;
     if (!orderId) return reply.code(400).send({ error: 'order_id_required' });

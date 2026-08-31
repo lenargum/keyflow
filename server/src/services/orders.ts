@@ -40,7 +40,7 @@ export class OrderError extends Error {
  * Цену считает сервер. От клиента приходит только sku:
  * данным от клиента не доверяем, сумма берётся из products.
  */
-export async function createOrder(sku: string): Promise<Order> {
+export async function createOrder(sku: string, id?: string): Promise<Order> {
   const product = await one<{ price_rub: number }>(
     'SELECT price_rub FROM products WHERE sku = $1',
     [sku],
@@ -48,13 +48,15 @@ export async function createOrder(sku: string): Promise<Order> {
   if (!product) throw new OrderError(404, 'unknown_sku');
 
   const base = product.price_rub;
-  const id = `ord_${nano()}`;
+  // id задаётся снаружи только из QA-ручки — чтобы можно было прислать вебхук
+  // раньше, чем появится заказ (сценарий приёмки №3).
+  const orderId = id ?? `ord_${nano()}`;
 
   const order = await one<Order>(
     `INSERT INTO orders (id, sku, base_amount, discount, total_amount)
      VALUES ($1, $2, $3, 0, $3)
      RETURNING *`,
-    [id, sku, base],
+    [orderId, sku, base],
   );
   if (!order) throw new OrderError(500, 'order_not_created');
   return order;
