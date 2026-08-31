@@ -49,3 +49,26 @@ jobs:
         run: npm run test:races
         env:
           TEST_PG_URL: postgres://keyflow:keyflow@localhost:5432
+
+  deploy:
+    needs: build-and-race
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      # Ключ прописан на сервере с forced command: он умеет запустить только
+      # /srv/keyflow/deploy.sh, шелла и портфорвардинга не даёт.
+      # Сам деплой ходит под непривилегированным пользователем keyflow,
+      # sudo разрешён ровно на рестарт двух юнитов.
+      - name: Ключ и known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Деплой
+        run: ssh -i ~/.ssh/deploy_key keyflow@${{ secrets.DEPLOY_HOST }}
