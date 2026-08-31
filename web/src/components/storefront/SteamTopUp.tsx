@@ -16,7 +16,9 @@ export function SteamTopUp() {
   const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>('$');
 
   return (
-    <div className="grid grid-cols-[285px_minmax(0,1fr)_minmax(0,1.2fr)_200px] items-center gap-4">
+    // Тот же приём, что и у ряда иконок: блок из макета не ужимается ниже 1100px.
+    <div className="overflow-x-auto pb-1">
+      <div className="grid min-w-[1100px] grid-cols-[285px_minmax(0,1fr)_minmax(0,1.2fr)_200px] items-center gap-4">
       <div className="flex items-center gap-3">
         <span className="block size-[72px] shrink-0 overflow-hidden rounded-[16px] border-2 border-[#1482b3] shadow-icon">
           <img src="/figma/app-steam.png" alt="" className="size-full object-cover" />
@@ -77,8 +79,9 @@ export function SteamTopUp() {
         type="button"
         className="h-[64px] w-[200px] rounded-xl bg-black text-[16px] font-bold leading-[27px] text-white transition-opacity hover:opacity-85"
       >
-        Оплатить 500{currency}
-      </button>
+          Оплатить 500{currency}
+        </button>
+      </div>
     </div>
   );
 }

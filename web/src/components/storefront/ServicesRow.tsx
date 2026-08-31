@@ -19,13 +19,15 @@ const SERVICES: Service[] = [
 ];
 
 export function ServicesRow() {
+  // В макете у этого ряда overflow-auto: при нехватке ширины он скроллится,
+  // а не ломается. Иконки фиксированные, ужимать их нельзя.
   return (
-    <div className="flex items-start justify-between">
+    <div className="-mx-1 flex min-w-full items-start justify-between gap-4 overflow-x-auto px-1 pb-1">
       {SERVICES.map((service) => (
         <button
           key={service.name}
           type="button"
-          className="group flex w-[76px] flex-col items-center gap-2"
+          className="group flex w-[76px] shrink-0 flex-col items-center gap-2"
         >
           <span
             className="block size-[72px] overflow-hidden rounded-[16px] border-2 shadow-icon transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-card-hover"
@@ -43,7 +45,7 @@ export function ServicesRow() {
         </button>
       ))}
 
-      <button type="button" className="group flex w-[76px] flex-col items-center gap-2">
+      <button type="button" className="group flex w-[76px] shrink-0 flex-col items-center gap-2">
         <span className="flex size-[72px] items-center justify-center rounded-[16px] border-2 border-line-strong bg-page shadow-icon transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-card-hover">
           <img src="/figma/icon-more.svg" alt="" className="size-[28px]" />
         </span>

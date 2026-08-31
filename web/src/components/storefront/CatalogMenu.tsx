@@ -51,7 +51,7 @@ const PICKS = ['Скидки 90%', 'Популярные издатели', 'Л�
 export function CatalogMenu() {
   return (
     <div className="absolute left-0 right-0 top-full z-40 border-b border-line bg-white shadow-block">
-      <div className="mx-auto flex w-full max-w-[1200px] gap-6">
+      <div className="mx-auto flex w-full max-w-[1200px] gap-6 overflow-x-auto">
         <aside className="w-[320px] shrink-0 py-4">
           {SIDEBAR.map((item, i) => (
             <button
@@ -66,7 +66,7 @@ export function CatalogMenu() {
           ))}
         </aside>
 
-        <div className="flex-1 py-8">
+        <div className="min-w-[856px] flex-1 py-8">
           <div className="grid grid-cols-5 gap-6">
             {COLUMNS.map((col) => (
               <div key={col.title}>
@@ -112,5 +112,5 @@ function ColumnTitle({ children }: { children: React.ReactNode }) {
 }
 
 function Chevron() {
-  return <img src="/figma/icon-chevron.svg" alt="" className="size-[12px] -rotate-90 opacity-60" />;
+  return <img src="/figma/icon-chevron.svg" alt="" className="size-[12px] opacity-60" />;
 }
