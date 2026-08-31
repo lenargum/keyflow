@@ -1,13 +1,17 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { orderRoutes } from './routes/orders.js';
 import { productRoutes } from './routes/products.js';
+import { qaRoutes } from './routes/qa.js';
+import { webhookRoutes } from './routes/webhooks.js';
 
 export function buildApp(): FastifyInstance {
-  const app = Fastify({
-    logger: { transport: undefined, level: process.env.LOG_LEVEL ?? 'info' },
-  });
+  const app = Fastify({ logger: false });
 
   app.get('/api/health', async () => ({ ok: true }));
   app.register(productRoutes);
+  app.register(orderRoutes);
+  app.register(webhookRoutes);
+  app.register(qaRoutes);
 
   return app;
 }

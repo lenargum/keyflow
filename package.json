@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "workspaces": ["server", "providers"],
+  "workspaces": ["server", "providers", "web"],
   "engines": { "node": ">=22" },
   "scripts": {
     "db:up": "docker compose up -d db",
