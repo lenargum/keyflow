@@ -49,8 +49,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   products: () => request<{ products: Product[] }>('/api/products'),
-  createOrder: (sku: string) =>
-    request<{ order: Order }>('/api/orders', { method: 'POST', body: JSON.stringify({ sku }) }),
+  createOrder: (sku: string, promoCode?: string) =>
+    request<{ order: Order }>('/api/orders', {
+      method: 'POST',
+      // Цену не шлём принципиально: сумму и скидку считает сервер.
+      body: JSON.stringify({ sku, promo_code: promoCode || undefined }),
+    }),
   order: (id: string) => request<OrderView>(`/api/orders/${id}`),
 
   // QA-ручки мутируют состояние, поэтому идут с токеном.
@@ -81,6 +85,14 @@ export type ProviderState = {
 
 export type AdminOrder = Order & { has_issuance: boolean };
 
+export type PromocodeRow = {
+  code: string;
+  type: 'percent' | 'amount';
+  value: number;
+  max_uses: number;
+  used_count: number;
+};
+
 async function authed<T>(path: string, init?: RequestInit): Promise<T> {
   return request<T>(path, {
     ...init,
@@ -93,6 +105,7 @@ export const admin = {
   reissue: (id: string) =>
     authed<{ result: string }>(`/api/admin/orders/${id}/reissue`, { method: 'POST', body: '{}' }),
   providers: () => authed<{ providers: ProviderState[] }>('/api/admin/providers'),
+  promocodes: () => authed<{ promocodes: PromocodeRow[] }>('/api/admin/promocodes'),
   configure: (cfg: Record<string, { errorRate?: number; timeoutRate?: number }>) =>
     authed<{ providers: ProviderState[] }>('/api/admin/providers/config', {
       method: 'POST',

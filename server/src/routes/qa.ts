@@ -32,7 +32,7 @@ export async function qaRoutes(app: FastifyInstance): Promise<void> {
     const sku = req.body?.sku;
     if (!sku) return reply.code(400).send({ error: 'sku_required' });
     try {
-      const order = await createOrder(sku, req.body?.order_id);
+      const order = await createOrder(sku, { id: req.body?.order_id });
       return reply.code(201).send({ order });
     } catch (err) {
       if (err instanceof OrderError) return reply.code(err.statusCode).send({ error: err.reason });

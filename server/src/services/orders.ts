@@ -1,5 +1,6 @@
 import { customAlphabet } from 'nanoid';
-import { one, query } from '../db.js';
+import { one, query, tx } from '../db.js';
+import { consume, PromoError } from './promo.js';
 
 const nano = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 12);
 
@@ -37,29 +38,52 @@ export class OrderError extends Error {
 }
 
 /**
- * Цену считает сервер. От клиента приходит только sku:
- * данным от клиента не доверяем, сумма берётся из products.
+ * Цену считает сервер. От клиента приходит только sku и, если есть, промокод:
+ * данным от клиента не доверяем, сумма и скидка берутся из БД.
+ *
+ * Списание промокода и создание заказа — в одной транзакции. Если вставка
+ * заказа упадёт, использование промокода откатится вместе с ней.
  */
-export async function createOrder(sku: string, id?: string): Promise<Order> {
-  const product = await one<{ price_rub: number }>(
-    'SELECT price_rub FROM products WHERE sku = $1',
-    [sku],
-  );
-  if (!product) throw new OrderError(404, 'unknown_sku');
+export async function createOrder(
+  sku: string,
+  opts: { id?: string; promoCode?: string } = {},
+): Promise<Order> {
+  return tx(async (client) => {
+    const product = await client.query<{ price_rub: number }>(
+      'SELECT price_rub FROM products WHERE sku = $1',
+      [sku],
+    );
+    const base = product.rows[0]?.price_rub;
+    if (base === undefined) throw new OrderError(404, 'unknown_sku');
 
-  const base = product.price_rub;
-  // id задаётся снаружи только из QA-ручки — чтобы можно было прислать вебхук
-  // раньше, чем появится заказ (сценарий приёмки №3).
-  const orderId = id ?? `ord_${nano()}`;
+    let discount = 0;
+    let promoCode: string | null = null;
+    if (opts.promoCode) {
+      try {
+        const applied = await consume(client, opts.promoCode, base);
+        discount = applied.amount;
+        promoCode = applied.code;
+      } catch (err) {
+        if (err instanceof PromoError) throw new OrderError(409, err.reason);
+        throw err;
+      }
+    }
 
-  const order = await one<Order>(
-    `INSERT INTO orders (id, sku, base_amount, discount, total_amount)
-     VALUES ($1, $2, $3, 0, $3)
-     RETURNING *`,
-    [orderId, sku, base],
-  );
-  if (!order) throw new OrderError(500, 'order_not_created');
-  return order;
+    // id задаётся снаружи только из QA-ручки — чтобы можно было прислать вебхук
+    // раньше, чем появится заказ (сценарий приёмки №3).
+    const orderId = opts.id ?? `ord_${nano()}`;
+
+    const res = await client.query<Order>(
+      `INSERT INTO orders (id, sku, base_amount, promo_code, discount, total_amount)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [orderId, sku, base, promoCode, discount, base - discount],
+    );
+
+    const order = res.rows[0];
+    if (!order) throw new OrderError(500, 'order_not_created');
+    return order;
+  });
 }
 
 export async function getOrder(id: string): Promise<Order | null> {

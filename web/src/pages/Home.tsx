@@ -9,6 +9,8 @@ import { api, type Product } from '../api.js';
 export function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [promo, setPromo] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -17,9 +19,12 @@ export function Home() {
 
   async function buy(sku: string) {
     setBusy(sku);
+    setError(null);
     try {
-      const { order } = await api.createOrder(sku);
+      const { order } = await api.createOrder(sku, promo.trim());
       navigate(`/orders/${order.id}`);
+    } catch (err) {
+      setError(PROMO_ERROR[(err as Error).message] ?? (err as Error).message);
     } finally {
       setBusy(null);
     }
@@ -27,7 +32,24 @@ export function Home() {
 
   return (
     <div className="mx-auto max-w-5xl p-8">
-      <h1 className="mb-6 text-2xl font-bold">Keyflow — каталог</h1>
+      <h1 className="mb-4 text-2xl font-bold">Keyflow — каталог</h1>
+
+      <div className="mb-6 flex flex-wrap items-end gap-3">
+        <label className="text-sm">
+          <div className="text-neutral-500">Промокод (необязательно)</div>
+          <input
+            value={promo}
+            onChange={(e) => setPromo(e.target.value.toUpperCase())}
+            placeholder="WELCOME10"
+            className="mt-1 w-48 rounded border border-neutral-300 px-2 py-1 font-mono text-sm"
+          />
+        </label>
+        <div className="text-xs text-neutral-500">
+          Скидку считает сервер. Демо-коды: WELCOME10, GG500, LIMIT3, ONCEONLY.
+        </div>
+      </div>
+
+      {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {products.map((p) => (
           <div key={p.sku} className="rounded-lg border border-neutral-200 p-4">
@@ -47,3 +69,8 @@ export function Home() {
     </div>
   );
 }
+
+const PROMO_ERROR: Record<string, string> = {
+  promo_not_found: 'Такого промокода нет',
+  promo_limit_reached: 'Лимит использований промокода исчерпан',
+};

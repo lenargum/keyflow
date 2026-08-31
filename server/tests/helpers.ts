@@ -132,3 +132,18 @@ export async function stuckOrders(): Promise<OrderRow[]> {
   const res = await get<{ orders: OrderRow[] }>(`${API}/api/admin/orders`);
   return res.orders;
 }
+
+export type PromocodeRow = {
+  code: string;
+  type: string;
+  value: number;
+  max_uses: number;
+  used_count: number;
+};
+
+export async function promocode(code: string): Promise<PromocodeRow> {
+  const res = await db.query<PromocodeRow>('SELECT * FROM promocodes WHERE code = $1', [code]);
+  const row = res.rows[0];
+  if (!row) throw new Error(`промокод ${code} не найден`);
+  return row;
+}

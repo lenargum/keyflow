@@ -2,12 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { createOrder, getOrderView, OrderError } from '../services/orders.js';
 
 export async function orderRoutes(app: FastifyInstance): Promise<void> {
-  app.post<{ Body: { sku?: string } }>('/api/orders', async (req, reply) => {
+  app.post<{ Body: { sku?: string; promo_code?: string } }>('/api/orders', async (req, reply) => {
     const sku = req.body?.sku;
     if (!sku) return reply.code(400).send({ error: 'sku_required' });
 
     try {
-      const order = await createOrder(sku);
+      const order = await createOrder(sku, { promoCode: req.body?.promo_code });
       console.log(`[orders] создан ${order.id} ${order.sku} ${order.total_amount}₽`);
       return reply.code(201).send({ order });
     } catch (err) {

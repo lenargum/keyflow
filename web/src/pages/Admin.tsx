@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { admin, api, type AdminOrder } from '../api.js';
+import { admin, api, type AdminOrder, type PromocodeRow } from '../api.js';
 import { getToken, setToken } from '../auth.js';
 import { ProviderControls } from '../components/ProviderControls.js';
 
@@ -12,12 +12,14 @@ export function Admin() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [showAll, setShowAll] = useState(false);
   const [token, setTokenState] = useState(getToken());
+  const [promocodes, setPromocodes] = useState<PromocodeRow[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       setOrders((await admin.orders(showAll)).orders);
+      setPromocodes((await admin.promocodes()).promocodes);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -117,6 +119,30 @@ export function Admin() {
                   >
                     Выдать повторно
                   </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="font-semibold">Промокоды</h2>
+        <table className="mt-2 w-full text-left text-sm">
+          <thead className="text-neutral-500">
+            <tr>
+              <th className="py-1">код</th>
+              <th>скидка</th>
+              <th>использовано</th>
+            </tr>
+          </thead>
+          <tbody>
+            {promocodes.map((p) => (
+              <tr key={p.code} className="border-t border-neutral-100">
+                <td className="py-1 font-mono text-xs">{p.code}</td>
+                <td>{p.type === 'percent' ? `${p.value}%` : `${p.value} ₽`}</td>
+                <td className={p.used_count >= p.max_uses ? 'text-amber-700' : ''}>
+                  {p.used_count} из {p.max_uses}
                 </td>
               </tr>
             ))}

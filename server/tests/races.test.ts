@@ -9,6 +9,7 @@ import {
   drainProviders,
   orderRow,
   post,
+  promocode,
   providerStates,
   refillProvider,
   reissue,
@@ -240,5 +241,82 @@ describe('восстановление через админку', () => {
       body: JSON.stringify({ event_id: 'evt_open', order_id: 'ord_none', status: 'paid' }),
     });
     expect(hook.status).toBe(200);
+  });
+});
+
+describe('промокоды', () => {
+  it('5. промокод с лимитом N под параллельными запросами применяется ровно N раз', async () => {
+    const attempts = 50;
+    const promo = await promocode('LIMIT3');
+    expect(promo.max_uses).toBe(3);
+    expect(promo.used_count).toBe(0);
+
+    // Пятьдесят заказов стартуют одновременно, каждый пытается списать LIMIT3.
+    const results = await Promise.all(
+      Array.from({ length: attempts }, () =>
+        fetch(`${API}/api/orders`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ sku: 'KEY-GTA5', promo_code: 'LIMIT3' }),
+        }).then(async (res) => ({ status: res.status, body: await res.json() })),
+      ),
+    );
+
+    const created = results.filter((r) => r.status === 201);
+    const rejected = results.filter((r) => r.status === 409);
+
+    expect(created).toHaveLength(3);
+    expect(rejected).toHaveLength(attempts - 3);
+    expect(rejected.every((r) => (r.body as { error: string }).error === 'promo_limit_reached')).toBe(
+      true,
+    );
+
+    // Счётчик в базе и число заказов с этим промокодом сошлись.
+    expect((await promocode('LIMIT3')).used_count).toBe(3);
+    const withPromo = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM orders WHERE promo_code = 'LIMIT3'`,
+    );
+    expect(Number(withPromo.rows[0]?.n)).toBe(3);
+  });
+
+  it('скидку считает сервер, цену от клиента не принимает', async () => {
+    // percent: 25% от 1990 = 497 (округление вниз)
+    const percent = await post<{ order: { base_amount: number; discount: number; total_amount: number } }>(
+      `${API}/api/orders`,
+      { sku: 'KEY-GTA5', promo_code: 'WELCOME10', price_rub: 1, total_amount: 1 },
+    );
+    expect(percent.order.base_amount).toBe(1990);
+    expect(percent.order.discount).toBe(199);
+    expect(percent.order.total_amount).toBe(1791);
+
+    // amount: фиксированные 500 ₽
+    const amount = await post<{ order: { discount: number; total_amount: number } }>(
+      `${API}/api/orders`,
+      { sku: 'KEY-GTA5', promo_code: 'GG500' },
+    );
+    expect(amount.order.discount).toBe(500);
+    expect(amount.order.total_amount).toBe(1490);
+
+    // Скидка больше цены не уводит сумму в минус.
+    const capped = await post<{ order: { discount: number; total_amount: number } }>(
+      `${API}/api/orders`,
+      { sku: 'SUB-SPOTIFY-1M', promo_code: 'GG500' },
+    );
+    expect(capped.order.discount).toBe(299);
+    expect(capped.order.total_amount).toBe(0);
+  });
+
+  it('неизвестный промокод отклоняется и заказ не создаётся', async () => {
+    const before = await db.query<{ n: string }>('SELECT count(*)::text AS n FROM orders');
+    const res = await fetch(`${API}/api/orders`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sku: 'KEY-GTA5', promo_code: 'NOPE' }),
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe('promo_not_found');
+
+    const after = await db.query<{ n: string }>('SELECT count(*)::text AS n FROM orders');
+    expect(after.rows[0]?.n).toBe(before.rows[0]?.n);
   });
 });

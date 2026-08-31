@@ -25,6 +25,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/api/admin/providers', async () => providerState());
 
+  /** Видно, как расход промокода упирается в лимит. */
+  app.get('/api/admin/promocodes', async () => {
+    const res = await query(
+      'SELECT code, type, value, max_uses, used_count FROM promocodes ORDER BY code',
+    );
+    return { promocodes: res.rows };
+  });
+
   app.post('/api/admin/providers/config', async (req) => providerAdmin('config', req.body));
 
   app.post('/api/admin/providers/refill', async (req) => providerAdmin('refill', req.body));

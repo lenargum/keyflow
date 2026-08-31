@@ -65,7 +65,18 @@ export function OrderStatus() {
 
       <h1 className="mt-4 text-xl font-bold">Заказ {order.id}</h1>
       <div className="mt-2 text-neutral-600">
-        {order.sku} · {order.total_amount} ₽
+        {order.sku} ·{' '}
+        {order.discount > 0 ? (
+          <>
+            <span className="line-through">{order.base_amount} ₽</span>{' '}
+            <span className="font-semibold">{order.total_amount} ₽</span>{' '}
+            <span className="text-sm text-emerald-700">
+              промокод {order.promo_code}, −{order.discount} ₽
+            </span>
+          </>
+        ) : (
+          <>{order.total_amount} ₽</>
+        )}
       </div>
 
       <div className="mt-4 rounded-lg border border-neutral-200 p-4">
