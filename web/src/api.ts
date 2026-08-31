@@ -1,3 +1,5 @@
+import { getToken } from './auth.js';
+
 export type Product = {
   sku: string;
   name: string;
@@ -50,9 +52,61 @@ export const api = {
   createOrder: (sku: string) =>
     request<{ order: Order }>('/api/orders', { method: 'POST', body: JSON.stringify({ sku }) }),
   order: (id: string) => request<OrderView>(`/api/orders/${id}`),
+
+  // QA-ручки мутируют состояние, поэтому идут с токеном.
   pay: (body: { order_id: string; outcome?: 'paid' | 'failed'; times?: number; event_id?: string }) =>
     request<{ sent: { event_id: string; http: number; duplicate: boolean }[] }>('/api/qa/pay', {
       method: 'POST',
+      headers: { authorization: `Bearer ${getToken()}` },
       body: JSON.stringify(body),
     }),
+  createOrderWithId: (sku: string, orderId: string) =>
+    request<{ order: Order }>('/api/qa/orders', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${getToken()}` },
+      body: JSON.stringify({ sku, order_id: orderId }),
+    }),
+};
+
+// --- админка и QA: всё за bearer-токеном ---
+
+export type ProviderState = {
+  provider: string;
+  remaining: number;
+  issued: number;
+  errorRate: number;
+  timeoutRate: number;
+  hangMs: number;
+};
+
+export type AdminOrder = Order & { has_issuance: boolean };
+
+async function authed<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(path, {
+    ...init,
+    headers: { authorization: `Bearer ${getToken()}`, ...(init?.headers ?? {}) },
+  });
+}
+
+export const admin = {
+  orders: (all = false) => authed<{ orders: AdminOrder[] }>(`/api/admin/orders${all ? '?all=1' : ''}`),
+  reissue: (id: string) =>
+    authed<{ result: string }>(`/api/admin/orders/${id}/reissue`, { method: 'POST', body: '{}' }),
+  providers: () => authed<{ providers: ProviderState[] }>('/api/admin/providers'),
+  configure: (cfg: Record<string, { errorRate?: number; timeoutRate?: number }>) =>
+    authed<{ providers: ProviderState[] }>('/api/admin/providers/config', {
+      method: 'POST',
+      body: JSON.stringify(cfg),
+    }),
+  refill: (provider: string, count: number) =>
+    authed<{ provider: string; remaining: number }>('/api/admin/providers/refill', {
+      method: 'POST',
+      body: JSON.stringify({ provider, count }),
+    }),
+  drain: (provider?: string) =>
+    authed<{ drained: Record<string, number> }>('/api/admin/providers/drain', {
+      method: 'POST',
+      body: JSON.stringify(provider ? { provider } : {}),
+    }),
+  reset: () => authed<{ ok: boolean }>('/api/admin/reset', { method: 'POST', body: '{}' }),
 };

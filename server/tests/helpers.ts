@@ -1,19 +1,24 @@
 import pg from 'pg';
-import { API, PROV, TEST_DB_URL } from './env.js';
+import { ADMIN_TOKEN, API, PROV, TEST_DB_URL } from './env.js';
 
 export const db = new pg.Pool({ connectionString: TEST_DB_URL });
+
+const authHeaders = {
+  'content-type': 'application/json',
+  authorization: `Bearer ${ADMIN_TOKEN}`,
+};
 
 export async function post<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: authHeaders,
     body: JSON.stringify(body),
   });
   return (await res.json()) as T;
 }
 
 export async function get<T>(url: string): Promise<T> {
-  return (await (await fetch(url)).json()) as T;
+  return (await (await fetch(url, { headers: authHeaders })).json()) as T;
 }
 
 export type OrderRow = {
@@ -104,3 +109,26 @@ export async function waitForStatus(
 }
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Заказ выпал из автоматического цикла: попытки исчерпаны, ждёт ручной выдачи. */
+export async function waitForParked(id: string, timeoutMs = 20_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const res = await db.query<{ parked: boolean; attempts: number }>(
+      `SELECT (next_attempt_at = 'infinity') AS parked, attempts FROM orders WHERE id = $1`,
+      [id],
+    );
+    if (res.rows[0]?.parked) return;
+    await sleep(100);
+  }
+  throw new Error(`заказ ${id} за ${timeoutMs}мс не припарковался`);
+}
+
+export async function reissue(orderId: string): Promise<{ result: string }> {
+  return post<{ result: string }>(`${API}/api/admin/orders/${orderId}/reissue`, {});
+}
+
+export async function stuckOrders(): Promise<OrderRow[]> {
+  const res = await get<{ orders: OrderRow[] }>(`${API}/api/admin/orders`);
+  return res.orders;
+}

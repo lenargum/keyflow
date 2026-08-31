@@ -112,6 +112,14 @@ app.post<{ Body: { provider?: string } }>('/admin/drain', async (req, reply) => 
   return { drained };
 });
 
+app.post('/admin/reset', async () => {
+  providers.a!.reset(allKeys.slice(0, SPLIT));
+  providers.b!.reset(allKeys.slice(SPLIT));
+  refillCounter = 0;
+  console.log('[providers] пулы сброшены в исходное состояние');
+  return { providers: Object.values(providers).map((p) => p.state()) };
+});
+
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
 }

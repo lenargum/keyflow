@@ -6,6 +6,7 @@ import {
   ADMIN_DB_URL,
   API,
   API_PORT,
+  MAX_DELIVERY_ATTEMPTS,
   PROV,
   PROVIDERS_PORT,
   PROVIDER_TIMEOUT_MS,
@@ -104,6 +105,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     PAYMENTS_POLL_MS: '50',
     DELIVERY_POLL_MS: '50',
     RETRY_OUT_OF_STOCK_MS: String(RETRY_OUT_OF_STOCK_MS),
+    MAX_DELIVERY_ATTEMPTS: String(MAX_DELIVERY_ATTEMPTS),
     RETRY_DELIVERY_FAILED_MS: String(RETRY_DELIVERY_FAILED_MS),
     ADMIN_TOKEN: 'test-admin-token',
   });

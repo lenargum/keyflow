@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { adminRoutes } from './routes/admin.js';
 import { orderRoutes } from './routes/orders.js';
 import { productRoutes } from './routes/products.js';
 import { qaRoutes } from './routes/qa.js';
@@ -8,6 +9,7 @@ export function buildApp(): FastifyInstance {
   const app = Fastify({ logger: false });
 
   app.get('/api/health', async () => ({ ok: true }));
+  app.register(adminRoutes);
   app.register(productRoutes);
   app.register(orderRoutes);
   app.register(webhookRoutes);

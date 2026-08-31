@@ -11,8 +11,11 @@ import {
   post,
   providerStates,
   refillProvider,
+  reissue,
   sleep,
+  stuckOrders,
   totalIssued,
+  waitForParked,
   waitForStatus,
 } from './helpers.js';
 
@@ -165,5 +168,77 @@ describe('ловушка таймаута', () => {
       [order.id],
     );
     expect(issuance.rows[0]?.provider).toBe('b');
+  });
+});
+
+describe('восстановление через админку', () => {
+  it('исчерпав попытки, заказ ждёт ручной выдачи — и она даёт ровно один ключ', async () => {
+    await drainProviders();
+
+    const order = await createOrder();
+    await post(`${API}/api/qa/pay`, { order_id: order.id, outcome: 'paid' });
+
+    await waitForStatus(order.id, ['out_of_stock']);
+    await waitForParked(order.id);
+
+    // Автоматические ретраи остановились: статус не двигается сам по себе.
+    const parked = await orderRow(order.id);
+    await sleep(1500);
+    expect((await orderRow(order.id)).attempts).toBe(parked.attempts);
+    expect(await countIssuances(order.id)).toBe(0);
+
+    // Заказ виден в списке «оплачен, но код не выдан».
+    expect((await stuckOrders()).map((o) => o.id)).toContain(order.id);
+
+    await refillProvider('a', 5);
+    const issuedBefore = await totalIssued();
+
+    expect((await reissue(order.id)).result).toBe('queued');
+    const final = await waitForStatus(order.id, ['delivered']);
+
+    expect(final.status).toBe('delivered');
+    expect(await countIssuances(order.id)).toBe(1);
+    expect((await totalIssued()) - issuedBefore).toBe(1);
+    expect((await stuckOrders()).map((o) => o.id)).not.toContain(order.id);
+  });
+
+  it('повторная ручная выдача по доставленному заказу ничего не меняет', async () => {
+    const order = await createOrder();
+    await post(`${API}/api/qa/pay`, { order_id: order.id, outcome: 'paid' });
+    await waitForStatus(order.id, ['delivered']);
+
+    const before = await db.query('SELECT * FROM issuances WHERE order_id = $1', [order.id]);
+    const issuedBefore = await totalIssued();
+
+    // Пять параллельных нажатий «выдать повторно» — как двойной клик в админке.
+    const results = await Promise.all(Array.from({ length: 5 }, () => reissue(order.id)));
+    expect(results.every((r) => r.result === 'already_delivered')).toBe(true);
+
+    await sleep(1000);
+
+    const after = await db.query('SELECT * FROM issuances WHERE order_id = $1', [order.id]);
+    expect(after.rows).toEqual(before.rows);
+    expect(await totalIssued()).toBe(issuedBefore);
+    expect((await orderRow(order.id)).status).toBe('delivered');
+  });
+
+  it('админка закрыта токеном', async () => {
+    const res = await fetch(`${API}/api/admin/orders`);
+    expect(res.status).toBe(401);
+
+    const qa = await fetch(`${API}/api/qa/pay`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ order_id: 'ord_x' }),
+    });
+    expect(qa.status).toBe(401);
+
+    // Вебхук платёжки остаётся открытым: подписи в задании нет, токена у неё тоже.
+    const hook = await fetch(`${API}/api/webhooks/payment`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ event_id: 'evt_open', order_id: 'ord_none', status: 'paid' }),
+    });
+    expect(hook.status).toBe(200);
   });
 });

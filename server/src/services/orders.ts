@@ -106,3 +106,33 @@ export async function getOrderView(id: string): Promise<OrderView | null> {
     events: events.rows,
   };
 }
+
+export type StuckOrder = Order & { has_issuance: boolean };
+
+/**
+ * Список «оплачен, но код не выдан» — рабочий экран админки.
+ * Критерий именно такой: деньги прошли, строки в issuances нет.
+ */
+export async function listStuckOrders(): Promise<StuckOrder[]> {
+  const res = await query<StuckOrder>(
+    `SELECT o.*, (i.id IS NOT NULL) AS has_issuance
+     FROM orders o
+     LEFT JOIN issuances i ON i.order_id = o.id
+     WHERE o.status IN ('paid','delivering','out_of_stock','delivery_failed')
+       AND i.id IS NULL
+     ORDER BY o.created_at`,
+  );
+  return res.rows;
+}
+
+export async function listOrders(limit = 50): Promise<StuckOrder[]> {
+  const res = await query<StuckOrder>(
+    `SELECT o.*, (i.id IS NOT NULL) AS has_issuance
+     FROM orders o
+     LEFT JOIN issuances i ON i.order_id = o.id
+     ORDER BY o.created_at DESC
+     LIMIT $1`,
+    [limit],
+  );
+  return res.rows;
+}

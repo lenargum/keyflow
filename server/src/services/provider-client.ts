@@ -34,3 +34,23 @@ export async function issue(
     return { kind: 'error', message: e.message };
   }
 }
+
+/** Проксирование управляющих ручек заглушек: админка правит их на лету. */
+export async function providerAdmin<T = unknown>(path: string, body: unknown = {}): Promise<T> {
+  const res = await fetch(`${config.providersUrl}/admin/${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`providers/admin/${path} -> HTTP ${res.status}`);
+  return (await res.json()) as T;
+}
+
+export async function providerState<T = unknown>(): Promise<T> {
+  const res = await fetch(`${config.providersUrl}/admin/state`, {
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`providers/admin/state -> HTTP ${res.status}`);
+  return (await res.json()) as T;
+}

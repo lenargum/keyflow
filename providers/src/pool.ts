@@ -44,6 +44,14 @@ export class ProviderPool {
     return this.available.length;
   }
 
+  /** Вернуть пул в исходное состояние: коды на месте, история выдач забыта. */
+  reset(keys: string[]): void {
+    this.available = [...keys];
+    this.byRequest.clear();
+    this.errorRate = 0;
+    this.timeoutRate = 0;
+  }
+
   /** Опустошить пул — сценарий приёмки №4. */
   drain(): number {
     const n = this.available.length;

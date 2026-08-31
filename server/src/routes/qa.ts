@@ -2,6 +2,7 @@ import { customAlphabet } from 'nanoid';
 import type { FastifyInstance } from 'fastify';
 import { config } from '../config.js';
 import { createOrder, OrderError } from '../services/orders.js';
+import { requireAdminToken } from './auth.js';
 
 const nano = customAlphabet('0123456789abcdefghijklmnopqrstuvwxyz', 10);
 
@@ -19,6 +20,9 @@ type PayBody = {
  * которым ходит платёжка.
  */
 export async function qaRoutes(app: FastifyInstance): Promise<void> {
+  // QA-ручки мутируют состояние — закрыты тем же токеном, что и админка.
+  requireAdminToken(app);
+
   /**
    * Создать заказ с заранее известным id. Нужно ровно для одного сценария:
    * прислать вебхук ДО того, как заказ появится в базе. Публичный

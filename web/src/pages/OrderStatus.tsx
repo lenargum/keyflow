@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, type OrderView } from '../api.js';
+import { admin, api, type OrderView } from '../api.js';
+import { ProviderControls } from '../components/ProviderControls.js';
 
 const STATUS_LABEL: Record<string, string> = {
   created: 'создан, ждёт оплаты',
@@ -53,9 +54,14 @@ export function OrderStatus() {
 
   return (
     <div className="mx-auto max-w-3xl p-8">
-      <Link to="/" className="text-sm text-neutral-500 hover:underline">
-        ← в каталог
-      </Link>
+      <div className="flex justify-between text-sm text-neutral-500">
+        <Link to="/" className="hover:underline">
+          ← в каталог
+        </Link>
+        <Link to="/admin" className="hover:underline">
+          админка →
+        </Link>
+      </div>
 
       <h1 className="mt-4 text-xl font-bold">Заказ {order.id}</h1>
       <div className="mt-2 text-neutral-600">
@@ -106,7 +112,22 @@ export function OrderStatus() {
           <Btn onClick={() => act('50 вебхуков разом', { order_id: id, outcome: 'paid', times: 50 })}>
             50 вебхуков разом
           </Btn>
+          <Btn
+            onClick={async () => {
+              const { result } = await admin.reissue(id);
+              setNote(`Повторная выдача: ${result}`);
+              void refresh();
+            }}
+          >
+            Выдать повторно
+          </Btn>
         </div>
+
+        <div className="mt-4 border-t border-neutral-200 pt-3">
+          <div className="mb-2 text-sm font-medium">Поставщики</div>
+          <ProviderControls onAction={setNote} />
+        </div>
+
         {note && <div className="mt-3 text-sm text-neutral-700">{note}</div>}
       </div>
 

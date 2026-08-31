@@ -124,3 +124,31 @@ async function record(
 
   console.log(`[delivery] ${order.id} -> delivered (${provider}, ${code})`);
 }
+
+/**
+ * Ручная повторная выдача из админки.
+ *
+ * Идемпотентна по построению: заказ возвращается в очередь, а не выдаётся тут же.
+ * Задвоиться выдача не может — request_id остаётся тем же `req_<order_id>`,
+ * поставщик обязан вернуть по нему прежний код, а issuances.order_id UNIQUE
+ * не пустит вторую строку.
+ *
+ * delivering в списке разрешённых статусов намеренно: заказ, зависший из-за
+ * упавшего процесса, иначе не подберёт ни один цикл воркера.
+ */
+export async function reissue(orderId: string): Promise<'queued' | 'already_delivered' | 'not_recoverable' | 'not_found'> {
+  const order = await one<{ status: string }>('SELECT status FROM orders WHERE id = $1', [orderId]);
+  if (!order) return 'not_found';
+  if (order.status === 'delivered') return 'already_delivered';
+
+  const res = await query(
+    `UPDATE orders
+     SET status = 'paid', attempts = 0, next_attempt_at = now(), last_error = NULL, updated_at = now()
+     WHERE id = $1 AND status IN ('paid','delivering','out_of_stock','delivery_failed')`,
+    [orderId],
+  );
+
+  if ((res.rowCount ?? 0) === 0) return 'not_recoverable';
+  console.log(`[admin] ${orderId} возвращён в очередь на выдачу`);
+  return 'queued';
+}
