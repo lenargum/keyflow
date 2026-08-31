@@ -1,0 +1,25 @@
+# локальные материалы, не для публичного репозитория
+docs/private/
+
+# зависимости и сборка
+node_modules/
+dist/
+build/
+.vite/
+
+# окружение
+.env
+.env.*
+!.env.example
+
+# логи и мусор редакторов
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# сборка TypeScript
+server/dist/
+providers/dist/

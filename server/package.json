@@ -1,0 +1,27 @@
+{
+  "name": "@keyflow/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../.env src/index.ts",
+    "start": "node --env-file=../.env dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:migrate": "tsx --env-file=../.env src/migrate.ts",
+    "db:seed": "tsx --env-file=../.env seed/seed.ts",
+    "db:reset": "tsx --env-file=../.env src/migrate.ts --reset && tsx --env-file=../.env seed/seed.ts",
+    "test:races": "vitest run tests/races.test.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.2.1",
+    "nanoid": "^5.0.9",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.11"
+  }
+}
