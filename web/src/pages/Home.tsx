@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api, type Product } from '../api.js';
+import { BannerCarousel } from '../components/storefront/BannerCarousel.js';
+import { Header } from '../components/storefront/Header.js';
+import { ProductSection } from '../components/storefront/ProductSection.js';
+import { ServicesRow } from '../components/storefront/ServicesRow.js';
+import { SteamTopUp } from '../components/storefront/SteamTopUp.js';
 
 /**
- * Временная витрина этапа 1: список товаров и кнопка «Купить».
- * Вёрстка по макету приезжает на этапе 5.
+ * Витрина по макету: шапка, баннер, ряд иконок сервисов, блок пополнения
+ * Steam, ряд карточек товара. Отзывы, футер и остальные ряды карточек
+ * заданием исключены.
  */
 export function Home() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [busy, setBusy] = useState<string | null>(null);
   const [promo, setPromo] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -31,41 +37,45 @@ export function Home() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
-      <h1 className="mb-4 text-2xl font-bold">Keyflow — каталог</h1>
+    <div className="min-h-screen bg-page">
+      <Header />
 
-      <div className="mb-6 flex flex-wrap items-end gap-3">
-        <label className="text-sm">
-          <div className="text-neutral-500">Промокод (необязательно)</div>
-          <input
-            value={promo}
-            onChange={(e) => setPromo(e.target.value.toUpperCase())}
-            placeholder="WELCOME10"
-            className="mt-1 w-48 rounded border border-neutral-300 px-2 py-1 font-mono text-sm"
-          />
-        </label>
-        <div className="text-xs text-neutral-500">
-          Скидку считает сервер. Демо-коды: WELCOME10, GG500, LIMIT3, ONCEONLY.
+      <main className="mx-auto w-full max-w-[1200px] space-y-6 py-6">
+        <BannerCarousel />
+
+        <div className="flex flex-col gap-4 rounded-[16px] bg-white p-5 shadow-block">
+          <ServicesRow />
+          <div className="h-px w-full bg-line" />
+          <SteamTopUp />
         </div>
-      </div>
 
-      {error && <div className="mb-4 text-sm text-red-600">{error}</div>}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {products.map((p) => (
-          <div key={p.sku} className="rounded-lg border border-neutral-200 p-4">
-            <div className="text-xs uppercase text-neutral-400">{p.type}</div>
-            <div className="mt-1 font-medium">{p.name}</div>
-            <div className="mt-2 text-lg font-semibold">{p.price_rub} ₽</div>
-            <button
-              onClick={() => buy(p.sku)}
-              disabled={busy !== null}
-              className="mt-3 w-full rounded bg-neutral-900 px-4 py-2 text-white disabled:opacity-40"
-            >
-              {busy === p.sku ? 'Создаём заказ…' : 'Купить'}
-            </button>
+        {/* Промокод в макете не предусмотрен — этап 4 требует его отдельно. */}
+        <div className="flex flex-wrap items-center gap-3 rounded-[16px] bg-white p-4 shadow-block">
+          <label className="text-[13px] font-bold text-body">
+            Промокод
+            <input
+              value={promo}
+              onChange={(e) => setPromo(e.target.value.toUpperCase())}
+              placeholder="WELCOME10"
+              className="ml-3 w-48 rounded-lg bg-surface px-3 py-2 font-mono text-[13px] font-semibold text-ink outline-none placeholder:text-muted focus:ring-2 focus:ring-black/10"
+            />
+          </label>
+          <span className="text-[12px] font-semibold text-muted">
+            Скидку считает сервер. Демо-коды: WELCOME10, GG500, LIMIT3, ONCEONLY.
+          </span>
+          <Link to="/admin" className="ml-auto text-[12px] font-semibold text-muted hover:text-ink">
+            админка →
+          </Link>
+        </div>
+
+        {error && (
+          <div className="rounded-[16px] bg-white p-4 text-[13px] font-bold text-red-600 shadow-block">
+            {error}
           </div>
-        ))}
-      </div>
+        )}
+
+        <ProductSection products={products} busy={busy} onBuy={buy} />
+      </main>
     </div>
   );
 }
