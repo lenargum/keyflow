@@ -25,6 +25,9 @@ export default {
       },
       fontFamily: {
         sans: ['Montserrat', 'system-ui', 'sans-serif'],
+        // Значок «i» у поля логина в макете набран Georgia, а не Montserrat —
+        // у неё другая форма буквы, из-за Montserrat он смотрелся кривым.
+        serif: ['Georgia', 'serif'],
       },
       boxShadow: {
         // AX и 1Ч1Ч1Ч1 из макета

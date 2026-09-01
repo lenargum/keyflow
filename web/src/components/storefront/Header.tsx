@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CatalogMenu } from './CatalogMenu.js';
 
 /**
@@ -64,7 +65,13 @@ export function Header() {
           </button>
         </div>
 
-        <div className="flex size-[44px] shrink-0 items-center justify-center rounded-[10px] bg-page">
+        {/* Профиля в задании нет, поэтому кнопка ведёт в админку —
+            иначе туда попасть неоткуда. */}
+        <Link
+          to="/admin"
+          title="Админка"
+          className="flex size-[44px] shrink-0 items-center justify-center rounded-[10px] bg-page transition-colors hover:bg-line"
+        >
           <span className="relative block size-[20px]">
             <img
               src="/figma/icon-profile-head.svg"
@@ -77,7 +84,7 @@ export function Header() {
               className="absolute left-[18%] top-[53%] h-[35%] w-[65%]"
             />
           </span>
-        </div>
+        </Link>
       </div>
 
       {open && <CatalogMenu />}

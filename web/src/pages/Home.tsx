@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { api, type Product } from '../api.js';
 import { BannerCarousel } from '../components/storefront/BannerCarousel.js';
 import { Header } from '../components/storefront/Header.js';
 import { ProductSection } from '../components/storefront/ProductSection.js';
+import { PromoField } from '../components/storefront/PromoField.js';
 import { ServicesRow } from '../components/storefront/ServicesRow.js';
 import { SteamTopUp } from '../components/storefront/SteamTopUp.js';
 
@@ -27,7 +28,7 @@ export function Home() {
     setBusy(sku);
     setError(null);
     try {
-      const { order } = await api.createOrder(sku, promo.trim());
+      const { order } = await api.createOrder(sku, promo);
       navigate(`/orders/${order.id}`);
     } catch (err) {
       setError(PROMO_ERROR[(err as Error).message] ?? (err as Error).message);
@@ -46,33 +47,19 @@ export function Home() {
         <div className="flex flex-col gap-4 rounded-[16px] bg-white p-5 shadow-block">
           <ServicesRow />
           <div className="h-px w-full bg-line" />
-          <SteamTopUp />
+          <SteamTopUp
+            promoSlot={
+              <PromoField
+                value={promo}
+                onChange={(v) => {
+                  setPromo(v);
+                  setError(null);
+                }}
+                error={error}
+              />
+            }
+          />
         </div>
-
-        {/* Промокод в макете не предусмотрен — этап 4 требует его отдельно. */}
-        <div className="flex flex-wrap items-center gap-3 rounded-[16px] bg-white p-4 shadow-block">
-          <label className="text-[13px] font-bold text-body">
-            Промокод
-            <input
-              value={promo}
-              onChange={(e) => setPromo(e.target.value.toUpperCase())}
-              placeholder="WELCOME10"
-              className="ml-3 w-48 rounded-lg bg-surface px-3 py-2 font-mono text-[13px] font-semibold text-ink outline-none placeholder:text-muted focus:ring-2 focus:ring-black/10"
-            />
-          </label>
-          <span className="text-[12px] font-semibold text-muted">
-            Скидку считает сервер. Демо-коды: WELCOME10, GG500, LIMIT3, ONCEONLY.
-          </span>
-          <Link to="/admin" className="ml-auto text-[12px] font-semibold text-muted hover:text-ink">
-            админка →
-          </Link>
-        </div>
-
-        {error && (
-          <div className="rounded-[16px] bg-white p-4 text-[13px] font-bold text-red-600 shadow-block">
-            {error}
-          </div>
-        )}
 
         <ProductSection products={products} busy={busy} onBuy={buy} />
       </main>
