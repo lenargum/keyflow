@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { API, PROVIDER_HANG_MS } from './env.js';
+import type { OrderRow } from './helpers.js';
 import {
   configureProviders,
   countEvents,
@@ -393,5 +394,55 @@ describe('предпросмотр скидки', () => {
     });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toBe('promo_limit_reached');
+  });
+});
+
+describe('двойной клик «Купить»', () => {
+  it('два одновременных запроса с одним ключом дают один заказ', async () => {
+    const key = `idem_${Date.now()}`;
+    const send = () =>
+      fetch(`${API}/api/orders`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': key },
+        body: JSON.stringify({ sku: 'KEY-GTA5' }),
+      }).then(async (r) => ({ status: r.status, body: (await r.json()) as { order: OrderRow } }));
+
+    // Двойной клик — это два запроса, стартующих одновременно.
+    const [a, b] = await Promise.all([send(), send()]);
+
+    expect(a.body.order.id).toBe(b.body.order.id);
+    // Один создал (201), второй получил уже существующий (200).
+    expect([a.status, b.status].sort()).toEqual([200, 201]);
+
+    const rows = await db.query<{ n: string }>(
+      'SELECT count(*)::text AS n FROM orders WHERE idempotency_key = $1',
+      [key],
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(1);
+  });
+
+  it('десять повторов подряд не плодят заказы и не тратят промокод', async () => {
+    const key = `idem_serial_${Date.now()}`;
+    const before = await promocode('WELCOME10');
+
+    const ids = new Set<string>();
+    for (let i = 0; i < 10; i += 1) {
+      const res = await fetch(`${API}/api/orders`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': key },
+        body: JSON.stringify({ sku: 'KEY-GTA5', promo_code: 'WELCOME10' }),
+      });
+      ids.add(((await res.json()) as { order: OrderRow }).order.id);
+    }
+
+    expect(ids.size).toBe(1);
+    // Промокод списан ровно один раз, а не десять.
+    expect((await promocode('WELCOME10')).used_count).toBe(before.used_count + 1);
+  });
+
+  it('без ключа идемпотентности заказы создаются независимо', async () => {
+    // Осознанная покупка двух одинаковых товаров должна давать два заказа.
+    const [a, b] = await Promise.all([createOrder('KEY-GTA5'), createOrder('KEY-GTA5')]);
+    expect(a.id).not.toBe(b.id);
   });
 });

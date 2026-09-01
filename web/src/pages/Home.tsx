@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type Product, type PromoPreview } from '../api.js';
 import { BannerCarousel } from '../components/storefront/BannerCarousel.js';
@@ -34,28 +34,62 @@ export function Home() {
       setChecking(false);
       return;
     }
+
+    // Флаг отмены нужен на весь эффект, а не на колбэк таймера: ответ на
+    // «WELCOME1» может прийти позже ответа на «WELCOME10» и перетереть свежий.
+    let cancelled = false;
     setChecking(true);
+
     const timer = setTimeout(() => {
-      let cancelled = false;
       api
         .previewPromo(promo)
-        .then((r) => !cancelled && setPreview(r))
-        .catch(() => !cancelled && setPreview(null))
-        .finally(() => !cancelled && setChecking(false));
-      return () => (cancelled = true);
+        .then((r) => {
+          if (!cancelled) setPreview(r);
+        })
+        .catch(() => {
+          if (!cancelled) setPreview(null);
+        })
+        .finally(() => {
+          if (!cancelled) setChecking(false);
+        });
     }, 350);
-    return () => clearTimeout(timer);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [promo]);
 
+  /**
+   * Ключ идемпотентности живёт на намерение купить конкретный товар и
+   * переживает двойной клик. После успешного заказа сбрасывается: осознанная
+   * вторая покупка того же товара должна создать новый заказ, а не вернуть старый.
+   */
+  const keys = useRef(new Map<string, string>());
+  // Синхронный замок: state обновляется к следующей перерисовке, а второй клик
+  // двойного клика прилетает раньше неё.
+  const inFlight = useRef(false);
+
   async function buy(sku: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+
+    let key = keys.current.get(sku);
+    if (!key) {
+      key = crypto.randomUUID();
+      keys.current.set(sku, key);
+    }
+
     setBusy(sku);
     setError(null);
     try {
-      const { order } = await api.createOrder(sku, promo);
+      const { order } = await api.createOrder(sku, promo, key);
+      keys.current.delete(sku);
       navigate(`/orders/${order.id}`);
     } catch (err) {
       setError(PROMO_ERROR[(err as Error).message] ?? (err as Error).message);
     } finally {
+      inFlight.current = false;
       setBusy(null);
     }
   }

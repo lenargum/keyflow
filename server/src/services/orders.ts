@@ -37,16 +37,49 @@ export class OrderError extends Error {
   }
 }
 
+/** Нарушение UNIQUE в Postgres. */
+const UNIQUE_VIOLATION = '23505';
+
 /**
  * Цену считает сервер. От клиента приходит только sku и, если есть, промокод:
  * данным от клиента не доверяем, сумма и скидка берутся из БД.
  *
  * Списание промокода и создание заказа — в одной транзакции. Если вставка
  * заказа упадёт, использование промокода откатится вместе с ней.
+ *
+ * Двойной клик «Купить» — такая же гонка, как повторный вебхук, и закрывается
+ * тем же приёмом: клиент присылает ключ идемпотентности, повтор отсекает UNIQUE
+ * в базе, а не проверка в коде. Проигравшая транзакция откатывается целиком,
+ * поэтому и промокод у неё не расходуется.
  */
 export async function createOrder(
   sku: string,
-  opts: { id?: string; promoCode?: string } = {},
+  opts: { id?: string; promoCode?: string; idempotencyKey?: string } = {},
+): Promise<{ order: Order; reused: boolean }> {
+  const key = opts.idempotencyKey;
+
+  // Быстрый путь: заказ по этому ключу уже создан — отдаём его, ничего не трогая.
+  if (key) {
+    const existing = await one<Order>('SELECT * FROM orders WHERE idempotency_key = $1', [key]);
+    if (existing) return { order: existing, reused: true };
+  }
+
+  try {
+    return { order: await insertOrder(sku, opts), reused: false };
+  } catch (err) {
+    // Гонку выиграл параллельный запрос с тем же ключом. Наша транзакция
+    // откатилась вместе со списанием промокода — остаётся отдать чужой заказ.
+    if (key && (err as { code?: string }).code === UNIQUE_VIOLATION) {
+      const winner = await one<Order>('SELECT * FROM orders WHERE idempotency_key = $1', [key]);
+      if (winner) return { order: winner, reused: true };
+    }
+    throw err;
+  }
+}
+
+async function insertOrder(
+  sku: string,
+  opts: { id?: string; promoCode?: string; idempotencyKey?: string },
 ): Promise<Order> {
   return tx(async (client) => {
     const product = await client.query<{ price_rub: number }>(
@@ -74,10 +107,10 @@ export async function createOrder(
     const orderId = opts.id ?? `ord_${nano()}`;
 
     const res = await client.query<Order>(
-      `INSERT INTO orders (id, sku, base_amount, promo_code, discount, total_amount)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO orders (id, sku, base_amount, promo_code, discount, total_amount, idempotency_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [orderId, sku, base, promoCode, discount, base - discount],
+      [orderId, sku, base, promoCode, discount, base - discount, opts.idempotencyKey ?? null],
     );
 
     const order = res.rows[0];

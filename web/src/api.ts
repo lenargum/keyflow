@@ -68,9 +68,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ code }),
     }),
-  createOrder: (sku: string, promoCode?: string) =>
-    request<{ order: Order }>('/api/orders', {
+  /**
+   * idempotencyKey должен быть один на НАМЕРЕНИЕ купить, а не на запрос:
+   * иначе двойной клик пришлёт два разных ключа и защита не сработает.
+   */
+  createOrder: (sku: string, promoCode: string | undefined, idempotencyKey: string) =>
+    request<{ order: Order; reused: boolean }>('/api/orders', {
       method: 'POST',
+      headers: { 'idempotency-key': idempotencyKey },
       // Цену не шлём принципиально: сумму и скидку считает сервер.
       body: JSON.stringify({ sku, promo_code: promoCode || undefined }),
     }),

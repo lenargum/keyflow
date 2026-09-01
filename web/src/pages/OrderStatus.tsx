@@ -46,11 +46,16 @@ export function OrderStatus() {
     }
   }, [id]);
 
+  // delivered и payment_failed финальны — дальше опрашивать сервер незачем.
+  // Восстановимые состояния финальными НЕ считаем: из них заказ ещё поедет.
+  const settled = view?.order.status === 'delivered' || view?.order.status === 'payment_failed';
+
   useEffect(() => {
     void refresh();
+    if (settled) return;
     const timer = setInterval(refresh, 1000);
     return () => clearInterval(timer);
-  }, [refresh]);
+  }, [refresh, settled]);
 
   async function act(label: string, body: Parameters<typeof api.pay>[0]) {
     setNote(`${label}…`);

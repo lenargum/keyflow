@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import { one, query } from '../db.js';
+import { one, query, tx } from '../db.js';
 import type { Order } from './orders.js';
 import { issue, type ProviderResult } from './provider-client.js';
 
@@ -102,6 +102,10 @@ export async function deliver(order: Order): Promise<void> {
  * Зафиксировать выдачу. Два констрейнта делают задвоение невозможным:
  * issuances.order_id UNIQUE и issuances.request_id UNIQUE.
  * ON CONFLICT DO NOTHING значит, что гонку выиграл кто-то другой.
+ *
+ * Обе записи в ОДНОЙ транзакции. Порознь между ними есть окно: упади процесс
+ * после вставки выдачи, но до смены статуса — код записан, а заказ навсегда
+ * висит в delivering, и покупатель своего кода не видит.
  */
 async function record(
   order: Order,
@@ -109,20 +113,32 @@ async function record(
   requestId: string,
   code: string,
 ): Promise<void> {
-  await query(
-    `INSERT INTO issuances (order_id, request_id, provider, code)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (order_id) DO NOTHING`,
-    [order.id, requestId, provider, code],
-  );
+  const stored = await tx(async (client) => {
+    const inserted = await client.query<{ code: string }>(
+      `INSERT INTO issuances (order_id, request_id, provider, code)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (order_id) DO NOTHING
+       RETURNING code`,
+      [order.id, requestId, provider, code],
+    );
 
-  await query(
-    `UPDATE orders SET status = 'delivered', last_error = NULL, updated_at = now()
-     WHERE id = $1 AND status <> 'delivered'`,
-    [order.id],
-  );
+    await client.query(
+      `UPDATE orders SET status = 'delivered', last_error = NULL, updated_at = now()
+       WHERE id = $1 AND status <> 'delivered'`,
+      [order.id],
+    );
 
-  console.log(`[delivery] ${order.id} -> delivered (${provider}, ${code})`);
+    // Пусто — значит выдачу записал кто-то другой; тогда и код у заказа его.
+    if (inserted.rows[0]) return inserted.rows[0].code;
+    const existing = await client.query<{ code: string }>(
+      'SELECT code FROM issuances WHERE order_id = $1',
+      [order.id],
+    );
+    return existing.rows[0]?.code ?? code;
+  });
+
+  const note = stored === code ? '' : ' (выдачу записал параллельный воркер)';
+  console.log(`[delivery] ${order.id} -> delivered (${provider}, ${stored})${note}`);
 }
 
 /**

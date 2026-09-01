@@ -1,4 +1,5 @@
-import { one, query } from '../db.js';
+import type pg from 'pg';
+import { query, tx } from '../db.js';
 
 export type PaymentEvent = {
   event_id: string;
@@ -40,18 +41,29 @@ export async function recordEvent(p: WebhookPayload): Promise<{ duplicate: boole
  * JOIN orders означает: событие для ещё не созданного заказа просто останется
  * необработанным и подберётся, когда заказ появится — сценарий приёмки №3.
  */
-export async function claimEvent(): Promise<PaymentEvent | null> {
-  return one<PaymentEvent>(
-    `UPDATE payment_events SET applied_at = now()
-     WHERE event_id = (
-       SELECT e.event_id FROM payment_events e
-       JOIN orders o ON o.id = e.order_id
-       WHERE e.applied_at IS NULL
-       ORDER BY e.received_at
-       FOR UPDATE SKIP LOCKED LIMIT 1
-     )
-     RETURNING *`,
-  );
+export async function processNextEvent(): Promise<{ event: PaymentEvent; changed: boolean } | null> {
+  return tx(async (client) => {
+    const claimed = await client.query<PaymentEvent>(
+      `UPDATE payment_events SET applied_at = now()
+       WHERE event_id = (
+         SELECT e.event_id FROM payment_events e
+         JOIN orders o ON o.id = e.order_id
+         WHERE e.applied_at IS NULL
+         ORDER BY e.received_at
+         FOR UPDATE SKIP LOCKED LIMIT 1
+       )
+       RETURNING *`,
+    );
+
+    const event = claimed.rows[0];
+    if (!event) return null;
+
+    // Пометка «применено» и само применение — в одной транзакции. Порознь
+    // между ними окно: упади процесс после пометки, но до смены статуса —
+    // событие считается обработанным, а заказ навсегда остаётся неоплаченным.
+    // Повтор вебхука его не спасёт: тот же event_id отсечёт первичный ключ.
+    return { event, changed: await applyEvent(client, event) };
+  });
 }
 
 /**
@@ -63,9 +75,9 @@ export async function claimEvent(): Promise<PaymentEvent | null> {
  *
  * paid побеждает failed независимо от порядка прихода — деньги реально прошли.
  */
-export async function applyEvent(event: PaymentEvent): Promise<boolean> {
+async function applyEvent(client: pg.PoolClient, event: PaymentEvent): Promise<boolean> {
   if (event.status === 'paid') {
-    const res = await query(
+    const res = await client.query(
       `UPDATE orders SET status = 'paid', updated_at = now()
        WHERE id = $1 AND status IN ('created','payment_failed')`,
       [event.order_id],
@@ -74,7 +86,7 @@ export async function applyEvent(event: PaymentEvent): Promise<boolean> {
   }
 
   if (event.status === 'failed') {
-    const res = await query(
+    const res = await client.query(
       `UPDATE orders SET status = 'payment_failed', updated_at = now()
        WHERE id = $1 AND status = 'created'`,
       [event.order_id],

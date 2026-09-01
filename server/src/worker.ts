@@ -1,6 +1,6 @@
 import { config } from './config.js';
 import { claimOrder, deliver } from './services/delivery.js';
-import { applyEvent, claimEvent } from './services/payments.js';
+import { processNextEvent } from './services/payments.js';
 
 let running = false;
 
@@ -19,9 +19,9 @@ async function loop(name: string, intervalMs: number, step: () => Promise<boolea
 
 /** Цикл 1: payment_events -> статус заказа. */
 async function paymentsStep(): Promise<boolean> {
-  const event = await claimEvent();
-  if (!event) return false;
-  const changed = await applyEvent(event);
+  const processed = await processNextEvent();
+  if (!processed) return false;
+  const { event, changed } = processed;
   console.log(
     `[worker:payments] ${event.event_id} ${event.order_id} ${event.status}` +
       (changed ? ' -> применено' : ' -> без изменений'),
