@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { one, query } from '../db.js';
 
 export type Promocode = {
   code: string;
@@ -49,4 +50,50 @@ export async function consume(client: pg.PoolClient, code: string, base: number)
 export function discountFor(promo: Promocode, base: number): number {
   const raw = promo.type === 'percent' ? Math.floor((base * promo.value) / 100) : promo.value;
   return Math.min(raw, base);
+}
+
+export type PromoPreview =
+  | { valid: false; reason: 'promo_not_found' | 'promo_limit_reached' }
+  | {
+      valid: true;
+      code: string;
+      type: 'percent' | 'amount';
+      value: number;
+      remaining_uses: number;
+      prices: Record<string, { base: number; discount: number; total: number }>;
+    };
+
+/**
+ * Предпросмотр скидки. Нужен ровно затем, чтобы покупатель видел результат
+ * ввода промокода, не считая деньги на клиенте: сервер считает — клиент рисует.
+ *
+ * Ничего не мутирует: ни одного UPDATE, использование не расходуется.
+ * Ответ НЕ является обязательством. Между предпросмотром и созданием заказа
+ * лимит может исчерпать кто-то другой, поэтому createOrder всё равно списывает
+ * использование атомарно и вправе отказать. Считаем той же discountFor,
+ * что и боевое списание, чтобы предпросмотр не разошёлся с реальной суммой.
+ */
+export async function preview(code: string): Promise<PromoPreview> {
+  const promo = await one<Promocode>('SELECT * FROM promocodes WHERE code = $1', [code]);
+  if (!promo) return { valid: false, reason: 'promo_not_found' };
+  if (promo.used_count >= promo.max_uses) return { valid: false, reason: 'promo_limit_reached' };
+
+  const products = await query<{ sku: string; price_rub: number }>(
+    'SELECT sku, price_rub FROM products',
+  );
+
+  const prices: Record<string, { base: number; discount: number; total: number }> = {};
+  for (const { sku, price_rub } of products.rows) {
+    const discount = discountFor(promo, price_rub);
+    prices[sku] = { base: price_rub, discount, total: price_rub - discount };
+  }
+
+  return {
+    valid: true,
+    code: promo.code,
+    type: promo.type,
+    value: promo.value,
+    remaining_uses: promo.max_uses - promo.used_count,
+    prices,
+  };
 }

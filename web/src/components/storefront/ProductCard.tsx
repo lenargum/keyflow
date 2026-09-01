@@ -11,13 +11,20 @@ import type { Product } from '../../api.js';
  */
 export function ProductCard({
   product,
+  price,
   busy,
   onBuy,
 }: {
   product: Product;
+  /**
+   * Цена со скидкой, если введён промокод. Считает её СЕРВЕР — карточка
+   * только показывает готовые числа и ничего не перемножает сама.
+   */
+  price: { base: number; discount: number; total: number } | null;
   busy: boolean;
   onBuy: (sku: string) => void;
 }) {
+  const discounted = price !== null && price.discount > 0;
   return (
     // Вся карточка кликабельна: действие у неё одно, и курсор-указатель
     // не должен обманывать — раз он появился, клик должен срабатывать.
@@ -32,9 +39,19 @@ export function ProductCard({
           {product.name}
         </h3>
 
+        {/* Перечёркнутая цена в макете уже есть — с промокодом она наконец
+            наполняется смыслом: слева итог от сервера, справа исходная цена. */}
         <div className="flex items-baseline gap-2">
-          <span className="text-[20px] font-bold leading-5 text-price">{product.price_rub} ₽</span>
-          <span className="text-[11px] font-bold uppercase text-strike">{product.type}</span>
+          <span className="text-[20px] font-bold leading-5 text-price">
+            {discounted ? price.total : product.price_rub} ₽
+          </span>
+          {discounted ? (
+            <span className="text-[11px] font-bold text-strike line-through">
+              {price.base} ₽
+            </span>
+          ) : (
+            <span className="text-[11px] font-bold uppercase text-strike">{product.type}</span>
+          )}
         </div>
 
         <button

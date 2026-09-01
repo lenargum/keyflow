@@ -320,3 +320,67 @@ describe('промокоды', () => {
     expect(after.rows[0]?.n).toBe(before.rows[0]?.n);
   });
 });
+
+describe('предпросмотр скидки', () => {
+  it('не расходует использование промокода, сколько ни спрашивай', async () => {
+    const before = await promocode('WELCOME10');
+
+    // Двадцать предпросмотров подряд и ещё двадцать параллельно.
+    for (let i = 0; i < 20; i += 1) {
+      await post(`${API}/api/promocodes/preview`, { code: 'WELCOME10' });
+    }
+    await Promise.all(
+      Array.from({ length: 20 }, () => post(`${API}/api/promocodes/preview`, { code: 'WELCOME10' })),
+    );
+
+    expect((await promocode('WELCOME10')).used_count).toBe(before.used_count);
+  });
+
+  it('показанная скидка совпадает с той, что реально спишется', async () => {
+    const shown = await post<{
+      valid: true;
+      prices: Record<string, { base: number; discount: number; total: number }>;
+    }>(`${API}/api/promocodes/preview`, { code: 'WELCOME10' });
+
+    const quoted = shown.prices['KEY-GTA5']!;
+
+    const created = await post<{
+      order: { base_amount: number; discount: number; total_amount: number };
+    }>(`${API}/api/orders`, { sku: 'KEY-GTA5', promo_code: 'WELCOME10' });
+
+    expect(created.order.base_amount).toBe(quoted.base);
+    expect(created.order.discount).toBe(quoted.discount);
+    expect(created.order.total_amount).toBe(quoted.total);
+  });
+
+  it('исчерпанный промокод показывается исчерпанным, а не считается', async () => {
+    // ONCEONLY с лимитом 1 — тратим единственное использование.
+    await post(`${API}/api/orders`, { sku: 'KEY-GTA5', promo_code: 'ONCEONLY' });
+
+    const shown = await post<{ valid: boolean; reason?: string }>(
+      `${API}/api/promocodes/preview`,
+      { code: 'ONCEONLY' },
+    );
+    expect(shown.valid).toBe(false);
+    expect(shown.reason).toBe('promo_limit_reached');
+
+    const unknown = await post<{ valid: boolean; reason?: string }>(
+      `${API}/api/promocodes/preview`,
+      { code: 'NOPE' },
+    );
+    expect(unknown.valid).toBe(false);
+    expect(unknown.reason).toBe('promo_not_found');
+  });
+
+  it('предпросмотр не даёт обещания: лимит проверяется заново при заказе', async () => {
+    // LIMIT3 к этому моменту уже исчерпан сценарием приёмки №5, но даже если
+    // предпросмотр когда-то показал скидку, заказ обязан отказать сам.
+    const res = await fetch(`${API}/api/orders`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sku: 'KEY-GTA5', promo_code: 'LIMIT3' }),
+    });
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe('promo_limit_reached');
+  });
+});

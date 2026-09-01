@@ -32,10 +32,13 @@ const CLAIMED_TYPES = new Set(TABS.flatMap((t) => t.types as readonly string[]))
 
 export function ProductSection({
   products,
+  prices,
   busy,
   onBuy,
 }: {
   products: Product[];
+  /** Цены со скидкой, посчитанные СЕРВЕРОМ под введённый промокод. */
+  prices: Record<string, { base: number; discount: number; total: number }> | null;
   busy: string | null;
   onBuy: (sku: string) => void;
 }) {
@@ -89,6 +92,7 @@ export function ProductSection({
             <ProductCard
               key={product.sku}
               product={product}
+              price={prices?.[product.sku] ?? null}
               busy={busy === product.sku}
               onBuy={onBuy}
             />

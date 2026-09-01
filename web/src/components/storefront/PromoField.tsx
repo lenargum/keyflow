@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { PromoPreview } from '../../api.js';
 
 /**
  * Промокода в макете нет — там на этом месте кнопка «Ввести промокод»,
@@ -12,14 +13,27 @@ import { createPortal } from 'react-dom';
 export function PromoField({
   value,
   onChange,
+  preview,
+  checking,
   error,
 }: {
   value: string;
   onChange: (v: string) => void;
+  preview: PromoPreview | null;
+  checking: boolean;
   error: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [box, setBox] = useState<{ top: number; left: number } | null>(null);
+
+  // Ничего не считаем сами: скидка приходит с сервера, здесь только формат.
+  const applied = preview?.valid === true;
+  const discountLabel =
+    preview?.valid === true
+      ? preview.type === 'percent'
+        ? `${preview.value}%`
+        : `${preview.value} ₽`
+      : '';
   const ref = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -65,10 +79,10 @@ export function PromoField({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-1 rounded-lg px-3 py-1 text-[12px] font-bold leading-[18px] transition-colors ${
-          value ? 'bg-price/15 text-price' : 'bg-promo-tint text-black hover:bg-promo-tint/70'
+          applied ? 'bg-price/15 text-price' : 'bg-promo-tint text-black hover:bg-promo-tint/70'
         }`}
       >
-        {value ? `Промокод ${value}` : 'Ввести промокод'}
+        {applied ? `${value} · −${discountLabel}` : 'Ввести промокод'}
         <img
           src="/figma/icon-chevron.svg"
           alt=""
@@ -106,16 +120,31 @@ export function PromoField({
             )}
           </div>
 
-          {error ? (
-            <div className="mt-2 text-[12px] font-bold text-red-600">{error}</div>
-          ) : (
-            <div className="mt-2 text-[12px] font-semibold text-muted">
-              Скидку считает сервер. Демо-коды: WELCOME10, GG500, LIMIT3, ONCEONLY.
-            </div>
-          )}
+          <div className="mt-2 text-[12px] font-semibold leading-[16px]">
+            {error ? (
+              <span className="font-bold text-red-600">{error}</span>
+            ) : checking ? (
+              <span className="text-muted">Проверяем на сервере…</span>
+            ) : applied ? (
+              <span className="font-bold text-price">
+                Скидка −{discountLabel}. Осталось применений: {preview.remaining_uses}
+              </span>
+            ) : preview && !preview.valid ? (
+              <span className="font-bold text-red-600">{REASON[preview.reason]}</span>
+            ) : (
+              <span className="text-muted">
+                Скидку считает сервер. Демо-коды: WELCOME10, GG500, LIMIT3, ONCEONLY.
+              </span>
+            )}
+          </div>
           </div>,
           document.body,
         )}
     </div>
   );
 }
+
+const REASON: Record<string, string> = {
+  promo_not_found: 'Такого промокода нет',
+  promo_limit_reached: 'Лимит использований исчерпан',
+};

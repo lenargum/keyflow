@@ -47,8 +47,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+/**
+ * Ответ предпросмотра скидки. Все суммы посчитаны сервером — клиент их только
+ * показывает. Это не обязательство: окончательную цену считает POST /api/orders.
+ */
+export type PromoPreview =
+  | { valid: false; reason: 'promo_not_found' | 'promo_limit_reached' }
+  | {
+      valid: true;
+      code: string;
+      type: 'percent' | 'amount';
+      value: number;
+      remaining_uses: number;
+      prices: Record<string, { base: number; discount: number; total: number }>;
+    };
+
 export const api = {
   products: () => request<{ products: Product[] }>('/api/products'),
+  previewPromo: (code: string) =>
+    request<PromoPreview>('/api/promocodes/preview', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
   createOrder: (sku: string, promoCode?: string) =>
     request<{ order: Order }>('/api/orders', {
       method: 'POST',
