@@ -353,6 +353,17 @@ describe('предпросмотр скидки', () => {
     expect(created.order.total_amount).toBe(quoted.total);
   });
 
+  it('остаток применений наружу не утекает', async () => {
+    // Ручка публичная: по убыли счётчика можно было бы считать чужие заказы.
+    const shown = await post<Record<string, unknown>>(`${API}/api/promocodes/preview`, {
+      code: 'WELCOME10',
+    });
+    expect(shown.valid).toBe(true);
+    expect(shown).not.toHaveProperty('remaining_uses');
+    expect(shown).not.toHaveProperty('used_count');
+    expect(shown).not.toHaveProperty('max_uses');
+  });
+
   it('исчерпанный промокод показывается исчерпанным, а не считается', async () => {
     // ONCEONLY с лимитом 1 — тратим единственное использование.
     await post(`${API}/api/orders`, { sku: 'KEY-GTA5', promo_code: 'ONCEONLY' });

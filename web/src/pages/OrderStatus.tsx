@@ -9,8 +9,22 @@ const STATUS_LABEL: Record<string, string> = {
   delivering: 'идёт получение кода',
   delivered: 'код выдан',
   payment_failed: 'оплата не прошла',
-  out_of_stock: 'оплачен, кода нет в наличии',
-  delivery_failed: 'поставщик не смог выдать',
+  out_of_stock: 'оплачен, ждёт поступления кода',
+  delivery_failed: 'оплачен, выдача задерживается',
+};
+
+/**
+ * out_of_stock и delivery_failed — восстановимые состояния, а не отказ.
+ * Покупателю важно понять именно это: деньги на месте, код догонит.
+ * Технические подробности (какой поставщик, сколько попыток) остаются
+ * в полях ниже — они для проверяющего, не для покупателя.
+ */
+const STATUS_NOTE: Record<string, string> = {
+  out_of_stock:
+    'Оплата прошла, но кода сейчас нет в наличии. Заказ в очереди: как только склад пополнят, код выдастся автоматически. Повторно платить не нужно.',
+  delivery_failed:
+    'Оплата прошла, поставщик пока не отвечает. Заказ в очереди на повторную выдачу. Повторно платить не нужно.',
+  payment_failed: 'Оплата не прошла, деньги не списаны. Можно оформить заказ заново.',
 };
 
 /**
@@ -84,8 +98,15 @@ export function OrderStatus() {
         <div className="text-lg font-semibold">
           {order.status} — {STATUS_LABEL[order.status] ?? ''}
         </div>
+        {STATUS_NOTE[order.status] && (
+          <div className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            {STATUS_NOTE[order.status]}
+          </div>
+        )}
         {order.last_error && (
-          <div className="mt-1 text-sm text-amber-700">последняя ошибка: {order.last_error}</div>
+          <div className="mt-2 text-sm text-neutral-500">
+            техническая причина: {order.last_error}
+          </div>
         )}
         <div className="mt-1 text-sm text-neutral-500">попыток выдачи: {order.attempts}</div>
       </div>

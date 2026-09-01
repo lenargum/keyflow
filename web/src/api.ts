@@ -58,7 +58,6 @@ export type PromoPreview =
       code: string;
       type: 'percent' | 'amount';
       value: number;
-      remaining_uses: number;
       prices: Record<string, { base: number; discount: number; total: number }>;
     };
 

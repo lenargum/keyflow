@@ -59,7 +59,6 @@ export type PromoPreview =
       code: string;
       type: 'percent' | 'amount';
       value: number;
-      remaining_uses: number;
       prices: Record<string, { base: number; discount: number; total: number }>;
     };
 
@@ -72,6 +71,12 @@ export type PromoPreview =
  * лимит может исчерпать кто-то другой, поэтому createOrder всё равно списывает
  * использование атомарно и вправе отказать. Считаем той же discountFor,
  * что и боевое списание, чтобы предпросмотр не разошёлся с реальной суммой.
+ *
+ * Остаток применений наружу НЕ отдаём. Ручка публичная и без токена: отдавая
+ * счётчик, мы дали бы любому желающему опрашивать её и считать по убыли
+ * счётчика, сколько заказов прошло с этим промокодом. Покупателю для решения
+ * нужны две вещи — работает ли код и сколько он экономит. Остаток — цифра
+ * для оператора, она есть в GET /api/admin/promocodes за токеном.
  */
 export async function preview(code: string): Promise<PromoPreview> {
   const promo = await one<Promocode>('SELECT * FROM promocodes WHERE code = $1', [code]);
@@ -93,7 +98,6 @@ export async function preview(code: string): Promise<PromoPreview> {
     code: promo.code,
     type: promo.type,
     value: promo.value,
-    remaining_uses: promo.max_uses - promo.used_count,
     prices,
   };
 }

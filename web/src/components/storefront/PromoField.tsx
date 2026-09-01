@@ -126,9 +126,7 @@ export function PromoField({
             ) : checking ? (
               <span className="text-muted">Проверяем на сервере…</span>
             ) : applied ? (
-              <span className="font-bold text-price">
-                Скидка −{discountLabel}. Осталось применений: {preview.remaining_uses}
-              </span>
+              <span className="font-bold text-price">Промокод действует. Скидка −{discountLabel}</span>
             ) : preview && !preview.valid ? (
               <span className="font-bold text-red-600">{REASON[preview.reason]}</span>
             ) : (
