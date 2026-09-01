@@ -5,11 +5,15 @@ import { ProductCard } from './ProductCard.js';
 /**
  * Ряд карточек товара с заголовком и табами, нода макета 1:145.
  *
- * Табы фильтруют каталог по типу товара. В каталоге из приложения к заданию
- * четыре типа, а табов в макете семь — под «Предметы» и «Аккаунты» товаров
- * просто нет, такие вкладки показывают пустое состояние. «Другое» подбирает
- * всё, что не попало ни в одну вкладку: если в каталоге заведут новый тип,
- * он не пропадёт с витрины.
+ * Табы работают как тоггл: по умолчанию не выбран ни один и виден весь
+ * каталог, клик фильтрует, повторный клик по активному — снимает фильтр.
+ * Так витрина сразу показывает всё, а не прячет три четверти товаров
+ * за случайно выбранной вкладкой.
+ *
+ * В каталоге из приложения к заданию четыре типа, а табов в макете семь —
+ * под «Предметы» и «Аккаунты» товаров просто нет, такие вкладки показывают
+ * пустое состояние. «Другое» подбирает всё, что не попало ни в одну вкладку:
+ * если в каталоге заведут новый тип, он не пропадёт с витрины.
  */
 const TABS = [
   { label: 'Донат', icon: '/figma/tab-donate.svg', types: ['topup'] },
@@ -32,7 +36,7 @@ export function ProductSection({
   busy: string | null;
   onBuy: (sku: string) => void;
 }) {
-  const [active, setActive] = useState<string>('Донат');
+  const [active, setActive] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     const tab = TABS.find((t) => t.label === active);
@@ -44,8 +48,17 @@ export function ProductSection({
   return (
     <section>
       <div className="flex items-center justify-between gap-4">
-        <h2 className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-heading">
+        <h2 className="flex items-baseline gap-2 whitespace-nowrap text-[20px] font-bold leading-[30px] text-heading">
           Популярные товары
+          {active && (
+            <button
+              type="button"
+              onClick={() => setActive(null)}
+              className="text-[12px] font-bold text-muted transition-colors hover:text-ink"
+            >
+              показать все
+            </button>
+          )}
         </h2>
 
         <div className="flex gap-2 overflow-x-auto">
@@ -54,15 +67,20 @@ export function ProductSection({
               key={tab.label}
               type="button"
               aria-pressed={active === tab.label}
-              onClick={() => setActive(tab.label)}
+              onClick={() => setActive((cur) => (cur === tab.label ? null : tab.label))}
               className={`flex h-[34px] shrink-0 items-center gap-2 rounded-[10px] px-3.5 text-[13px] font-bold leading-[19.5px] transition-colors ${
                 active === tab.label ? 'bg-black text-white' : 'bg-surface text-muted hover:bg-line'
               }`}
             >
+              {/* Все семь иконок выгружены одним серым #8A94A6, а на активном
+                  чёрном табе перекрашиваются в белый фильтром — иначе пришлось
+                  бы держать по два ассета на каждый таб. */}
               <img
                 src={tab.icon}
                 alt=""
-                className={`size-[14px] ${active === tab.label ? '' : 'opacity-50'}`}
+                className={`size-[14px] ${
+                  active === tab.label ? 'brightness-0 invert' : 'opacity-50'
+                }`}
               />
               {tab.label}
             </button>

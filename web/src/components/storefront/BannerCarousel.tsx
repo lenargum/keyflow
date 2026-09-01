@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Баннер-карусель, нода макета 1:641.
@@ -16,39 +16,80 @@ const SLIDES = [
 ];
 
 const AUTOPLAY_MS = 5000;
+const SLIDE_MS = 500;
+
+/**
+ * Лента с клонами по краям: [последний, ...слайды, первый]. Реальные слайды
+ * занимают позиции 1..N, позиции 0 и N+1 — клоны. Доехав до клона, лента
+ * молча, без анимации, переставляется на его настоящего двойника.
+ *
+ * Так переход с последнего слайда на первый выглядит шагом вперёд,
+ * а не перемоткой через всю ленту назад.
+ */
+const TRACK = [SLIDES[SLIDES.length - 1]!, ...SLIDES, SLIDES[0]!];
+const FIRST = 1;
+const LAST = SLIDES.length;
 
 export function BannerCarousel() {
-  const [index, setIndex] = useState(0);
+  const [pos, setPos] = useState(FIRST);
+  const [animate, setAnimate] = useState(true);
+  const paused = useRef(false);
 
-  const go = useCallback((delta: number) => {
-    setIndex((prev) => (prev + delta + SLIDES.length) % SLIDES.length);
-  }, []);
+  const go = useCallback((delta: number) => setPos((p) => p + delta), []);
 
   useEffect(() => {
-    const timer = setInterval(() => go(1), AUTOPLAY_MS);
+    const timer = setInterval(() => {
+      if (!paused.current) go(1);
+    }, AUTOPLAY_MS);
     return () => clearInterval(timer);
-  }, [go, index]);
+  }, [go]);
+
+  // Перестановка с клона на двойника: сначала без анимации, потом возвращаем её
+  // следующим кадром — иначе браузер успеет анимировать и сам прыжок.
+  useEffect(() => {
+    if (pos !== FIRST - 1 && pos !== LAST + 1) return;
+    const timer = setTimeout(() => {
+      setAnimate(false);
+      setPos(pos === FIRST - 1 ? LAST : FIRST);
+    }, SLIDE_MS);
+    return () => clearTimeout(timer);
+  }, [pos]);
+
+  useEffect(() => {
+    if (animate) return;
+    const frame = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(frame);
+  }, [animate]);
+
+  const active = (pos - FIRST + SLIDES.length) % SLIDES.length;
 
   return (
-    <section className="relative h-[263px] w-full">
+    <section
+      className="relative h-[263px] w-full"
+      onMouseEnter={() => (paused.current = true)}
+      onMouseLeave={() => (paused.current = false)}
+    >
       {/* Форма из макета: скруглённый прямоугольник с вырезом под стрелки. */}
       <img src="/figma/banner-shape.svg" alt="" className="absolute inset-0 size-full" />
 
-      {/* Слайды лежат в ряд и едут трансформом: подменять контент на месте
-          нельзя, переход должен быть виден. Обрезаем по скруглению баннера. */}
       <div className="absolute inset-0 overflow-hidden rounded-[16px]">
         <div
-          className="flex h-full transition-transform duration-500 ease-out"
-          style={{ width: `${SLIDES.length * 100}%`, transform: `translateX(-${index * (100 / SLIDES.length)}%)` }}
+          className={`flex h-full ${animate ? 'transition-transform ease-out' : ''}`}
+          style={{
+            width: `${TRACK.length * 100}%`,
+            transform: `translateX(-${pos * (100 / TRACK.length)}%)`,
+            transitionDuration: animate ? `${SLIDE_MS}ms` : undefined,
+          }}
         >
-          {SLIDES.map((s) => (
+          {TRACK.map((slide, i) => (
             <div
-              key={s.title}
+              key={`${slide.title}-${i}`}
               className="flex h-full flex-col justify-center px-12 text-white"
-              style={{ width: `${100 / SLIDES.length}%` }}
+              style={{ width: `${100 / TRACK.length}%` }}
+              aria-hidden={i !== pos}
             >
-              <div className="text-[32px] font-extrabold leading-tight">{s.title}</div>
-              <div className="mt-2 text-[16px] font-semibold text-white/60">{s.note}</div>
+              <div className="text-[32px] font-extrabold leading-tight">{slide.title}</div>
+              <div className="mt-2 text-[16px] font-semibold text-white/60">{slide.note}</div>
             </div>
           ))}
         </div>
@@ -73,18 +114,24 @@ export function BannerCarousel() {
         </button>
       </div>
 
-      <div className="absolute bottom-4 right-4 flex items-center gap-1">
-        {SLIDES.map((s, i) => (
+      {/* Сама полоска 20x4 как в макете, но кликабельная область вокруг неё
+          крупнее — целиться в четыре пикселя неудобно. */}
+      <div className="absolute bottom-1 right-2 flex items-center">
+        {SLIDES.map((slide, i) => (
           <button
-            key={s.title}
+            key={slide.title}
             type="button"
             aria-label={`Слайд ${i + 1}`}
-            aria-current={i === index}
-            onClick={() => setIndex(i)}
-            className={`h-[4px] w-[20px] rounded-[12px] transition-colors ${
-              i === index ? 'bg-white' : 'bg-white/45 hover:bg-white/70'
-            }`}
-          />
+            aria-current={i === active}
+            onClick={() => setPos(FIRST + i)}
+            className="group flex h-[24px] w-[26px] items-center justify-center"
+          >
+            <span
+              className={`h-[4px] w-[20px] rounded-[12px] transition-colors ${
+                i === active ? 'bg-white' : 'bg-white/45 group-hover:bg-white/70'
+              }`}
+            />
+          </button>
         ))}
       </div>
     </section>
