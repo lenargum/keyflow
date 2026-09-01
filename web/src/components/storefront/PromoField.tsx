@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { PromoPreview } from '../../api.js';
+import { describeError } from '../../useAction.js';
 
 /**
  * Промокода в макете нет — там на этом месте кнопка «Ввести промокод»,
@@ -122,13 +123,15 @@ export function PromoField({
 
           <div className="mt-2 text-[12px] font-semibold leading-[16px]">
             {error ? (
-              <span className="font-bold text-red-600">{error}</span>
+              <span className="font-bold text-red-600 first-letter:uppercase">{error}</span>
             ) : checking ? (
               <span className="text-muted">Проверяем на сервере…</span>
             ) : applied ? (
               <span className="font-bold text-price">Промокод действует. Скидка −{discountLabel}</span>
             ) : preview && !preview.valid ? (
-              <span className="font-bold text-red-600">{REASON[preview.reason]}</span>
+              <span className="font-bold text-red-600 first-letter:uppercase">
+                {describeError(preview.reason)}
+              </span>
             ) : (
               <span className="text-muted">
                 Скидку считает сервер. Демо-коды: WELCOME10, GG500, LIMIT3, ONCEONLY.
@@ -141,8 +144,3 @@ export function PromoField({
     </div>
   );
 }
-
-const REASON: Record<string, string> = {
-  promo_not_found: 'Такого промокода нет',
-  promo_limit_reached: 'Лимит использований исчерпан',
-};

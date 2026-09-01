@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type Product, type PromoPreview } from '../api.js';
+import { describeError } from '../useAction.js';
 import { BannerCarousel } from '../components/storefront/BannerCarousel.js';
 import { Header } from '../components/storefront/Header.js';
 import { ProductSection } from '../components/storefront/ProductSection.js';
@@ -87,7 +88,7 @@ export function Home() {
       keys.current.delete(sku);
       navigate(`/orders/${order.id}`);
     } catch (err) {
-      setError(PROMO_ERROR[(err as Error).message] ?? (err as Error).message);
+      setError(describeError(err));
     } finally {
       inFlight.current = false;
       setBusy(null);
@@ -130,8 +131,3 @@ export function Home() {
     </div>
   );
 }
-
-const PROMO_ERROR: Record<string, string> = {
-  promo_not_found: 'Такого промокода нет',
-  promo_limit_reached: 'Лимит использований промокода исчерпан',
-};

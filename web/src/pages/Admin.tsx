@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { admin, api, type AdminOrder, type PromocodeRow } from '../api.js';
 import { getToken, setToken } from '../auth.js';
+import { describeError, useAction } from '../useAction.js';
 import { ProviderControls } from '../components/ProviderControls.js';
 
 /**
@@ -13,8 +14,8 @@ export function Admin() {
   const [showAll, setShowAll] = useState(false);
   const [token, setTokenState] = useState(getToken());
   const [promocodes, setPromocodes] = useState<PromocodeRow[]>([]);
-  const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { note, failed, run } = useAction();
 
   const refresh = useCallback(async () => {
     try {
@@ -22,7 +23,7 @@ export function Admin() {
       setPromocodes((await admin.promocodes()).promocodes);
       setError(null);
     } catch (err) {
-      setError((err as Error).message);
+      setError(describeError(err));
     }
   }, [showAll]);
 
@@ -32,22 +33,28 @@ export function Admin() {
     return () => clearInterval(timer);
   }, [refresh]);
 
-  async function reissue(id: string) {
-    const { result } = await admin.reissue(id);
-    setNote(`${id}: ${RESULT_LABEL[result] ?? result}`);
-    void refresh();
+  function reissue(id: string) {
+    void run(`Повторная выдача ${id}`, async () => {
+      const { result } = await admin.reissue(id);
+      void refresh();
+      return RESULT_LABEL[result] ?? result;
+    });
   }
 
-  /** Сценарий приёмки №3: событие приходит раньше, чем появляется заказ. */
-  async function webhookBeforeOrder() {
+  /**
+   * Сценарий приёмки №3: событие приходит раньше, чем появляется заказ.
+   * Пауза между вебхуками и созданием заказа нужна, чтобы проверяющий успел
+   * увидеть события лежащими необработанными.
+   */
+  function webhookBeforeOrder() {
     const orderId = `ord_early${Math.random().toString(36).slice(2, 8)}`;
-    await api.pay({ order_id: orderId, outcome: 'paid', times: 3 });
-    setNote(`три вебхука по ${orderId} отправлены, заказа ещё нет — создаю через 2 секунды`);
-    setTimeout(async () => {
+    void run('Вебхук раньше заказа', async () => {
+      await api.pay({ order_id: orderId, outcome: 'paid', times: 3 });
+      await new Promise((r) => setTimeout(r, 2000));
       await api.createOrderWithId('KEY-GTA5', orderId);
-      setNote(`заказ ${orderId} создан, воркер подберёт лежащие события`);
       void refresh();
-    }, 2000);
+      return `три вебхука ушли до создания ${orderId}, заказ создан — воркер подберёт лежащие события`;
+    });
   }
 
   return (
@@ -153,7 +160,7 @@ export function Admin() {
       <section className="mt-8">
         <h2 className="font-semibold">Заглушки поставщиков</h2>
         <div className="mt-2">
-          <ProviderControls onAction={setNote} />
+          <ProviderControls />
         </div>
       </section>
 
@@ -167,11 +174,13 @@ export function Admin() {
             Вебхук раньше заказа
           </button>
           <button
-            onClick={async () => {
-              await admin.reset();
-              setNote('состояние сброшено: заказы стёрты, пулы поставщиков восстановлены');
-              void refresh();
-            }}
+            onClick={() =>
+              void run('Сброс состояния', async () => {
+                await admin.reset();
+                void refresh();
+                return 'заказы стёрты, пулы поставщиков восстановлены';
+              })
+            }
             className="rounded border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
           >
             Сбросить всё
@@ -179,7 +188,15 @@ export function Admin() {
         </div>
       </section>
 
-      {note && <div className="mt-6 rounded bg-neutral-100 p-3 text-sm">{note}</div>}
+      {note && (
+        <div
+          className={`mt-6 rounded p-3 text-sm ${
+            failed ? 'bg-red-50 font-semibold text-red-700' : 'bg-neutral-100'
+          }`}
+        >
+          {note}
+        </div>
+      )}
     </div>
   );
 }

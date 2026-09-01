@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { admin, type ProviderState } from '../api.js';
+import { describeError, useAction } from '../useAction.js';
 
 /**
  * Управление заглушками поставщиков: доли ошибок и зависаний, долив и
  * опустошение пула. Нужно, чтобы сценарии приёмки воспроизводились кликами.
  */
-export function ProviderControls({ onAction }: { onAction?: (note: string) => void }) {
+export function ProviderControls() {
   const [providers, setProviders] = useState<ProviderState[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const { note, failed, run } = useAction();
 
   const refresh = useCallback(async () => {
     try {
       setProviders((await admin.providers()).providers);
       setError(null);
     } catch (err) {
-      setError((err as Error).message);
+      setError(describeError(err));
     }
   }, []);
 
@@ -25,22 +27,34 @@ export function ProviderControls({ onAction }: { onAction?: (note: string) => vo
   }, [refresh]);
 
   async function change(provider: string, field: 'errorRate' | 'timeoutRate', value: number) {
+    const previous = providers;
+    // Двигаем ползунок сразу, но откатываем, если сервер не принял: иначе
+    // ползунок показывал бы долю, которой у поставщика нет.
     setProviders((prev) =>
       prev.map((p) => (p.provider === provider ? { ...p, [field]: value } : p)),
     );
-    await admin.configure({ [provider]: { [field]: value } });
+    try {
+      await admin.configure({ [provider]: { [field]: value } });
+    } catch (err) {
+      setProviders(previous);
+      setError(describeError(err));
+    }
   }
 
-  async function act(label: string, fn: () => Promise<unknown>) {
-    await fn();
-    onAction?.(label);
-    void refresh();
+  function act(label: string, fn: () => Promise<unknown>) {
+    void run(label, async () => {
+      await fn();
+      void refresh();
+    });
   }
 
-  if (error) return <div className="text-sm text-red-600">Поставщики недоступны: {error}</div>;
+  if (error && providers.length === 0) {
+    return <div className="text-sm text-red-600">Поставщики недоступны: {error}</div>;
+  }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
       {providers.map((p) => (
         <div key={p.provider} className="rounded border border-neutral-200 p-3">
           <div className="flex items-baseline justify-between">
@@ -77,7 +91,14 @@ export function ProviderControls({ onAction }: { onAction?: (note: string) => vo
           </div>
         </div>
       ))}
-    </div>
+      </div>
+
+      {note && (
+        <div className={`mt-2 text-sm ${failed ? 'font-semibold text-red-600' : 'text-neutral-600'}`}>
+          {note}
+        </div>
+      )}
+    </>
   );
 }
 

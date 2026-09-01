@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { admin, api, type OrderView } from '../api.js';
+import { describeError, useAction } from '../useAction.js';
 import { ProviderControls } from '../components/ProviderControls.js';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -35,14 +36,14 @@ export function OrderStatus() {
   const { id = '' } = useParams();
   const [view, setView] = useState<OrderView | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const { note, failed, run } = useAction();
 
   const refresh = useCallback(async () => {
     try {
       setView(await api.order(id));
       setError(null);
     } catch (err) {
-      setError((err as Error).message);
+      setError(describeError(err));
     }
   }, [id]);
 
@@ -57,15 +58,18 @@ export function OrderStatus() {
     return () => clearInterval(timer);
   }, [refresh, settled]);
 
-  async function act(label: string, body: Parameters<typeof api.pay>[0]) {
-    setNote(`${label}…`);
-    const { sent } = await api.pay(body);
-    const duplicates = sent.filter((s) => s.duplicate).length;
-    setNote(`${label}: отправлено ${sent.length}, дублей отсечено ${duplicates}`);
-    void refresh();
+  function act(label: string, body: Parameters<typeof api.pay>[0]) {
+    void run(label, async () => {
+      const { sent } = await api.pay(body);
+      const duplicates = sent.filter((s) => s.duplicate).length;
+      void refresh();
+      return `отправлено ${sent.length}, дублей отсечено ${duplicates}`;
+    });
   }
 
-  if (error) return <div className="p-8 text-red-600">Ошибка: {error}</div>;
+  // Страницу роняем только если показывать нечего. Сорванный опрос при уже
+  // загруженном заказе — повод для полоски, а не для белого экрана.
+  if (error && !view) return <div className="p-8 text-red-600">Ошибка: {error}</div>;
   if (!view) return <div className="p-8">Загрузка…</div>;
 
   const { order, code, issuance, events } = view;
@@ -81,6 +85,12 @@ export function OrderStatus() {
           админка →
         </Link>
       </div>
+
+      {error && (
+        <div className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          Не удалось обновить статус: {error}. Пробуем снова.
+        </div>
+      )}
 
       <h1 className="mt-4 text-xl font-bold">Заказ {order.id}</h1>
       <div className="mt-2 text-neutral-600">
@@ -150,11 +160,13 @@ export function OrderStatus() {
             50 вебхуков разом
           </Btn>
           <Btn
-            onClick={async () => {
-              const { result } = await admin.reissue(id);
-              setNote(`Повторная выдача: ${result}`);
-              void refresh();
-            }}
+            onClick={() =>
+              void run('Повторная выдача', async () => {
+                const { result } = await admin.reissue(id);
+                void refresh();
+                return REISSUE_RESULT[result] ?? result;
+              })
+            }
           >
             Выдать повторно
           </Btn>
@@ -162,10 +174,14 @@ export function OrderStatus() {
 
         <div className="mt-4 border-t border-neutral-200 pt-3">
           <div className="mb-2 text-sm font-medium">Поставщики</div>
-          <ProviderControls onAction={setNote} />
+          <ProviderControls />
         </div>
 
-        {note && <div className="mt-3 text-sm text-neutral-700">{note}</div>}
+        {note && (
+          <div className={`mt-3 text-sm ${failed ? 'font-semibold text-red-600' : 'text-neutral-700'}`}>
+            {note}
+          </div>
+        )}
       </div>
 
       <div className="mt-6">
@@ -214,3 +230,9 @@ function Btn({
     </button>
   );
 }
+
+const REISSUE_RESULT: Record<string, string> = {
+  queued: 'заказ возвращён в очередь на выдачу',
+  already_delivered: 'заказ уже доставлен, ничего не меняем',
+  not_recoverable: 'статус не допускает повторной выдачи',
+};
