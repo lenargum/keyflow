@@ -29,16 +29,29 @@ export function BannerCarousel() {
     return () => clearInterval(timer);
   }, [go, index]);
 
-  const slide = SLIDES[index]!;
-
   return (
     <section className="relative h-[263px] w-full">
       {/* Форма из макета: скруглённый прямоугольник с вырезом под стрелки. */}
       <img src="/figma/banner-shape.svg" alt="" className="absolute inset-0 size-full" />
 
-      <div className="absolute inset-0 flex flex-col justify-center px-12 text-white">
-        <div className="text-[32px] font-extrabold leading-tight">{slide.title}</div>
-        <div className="mt-2 text-[16px] font-semibold text-white/60">{slide.note}</div>
+      {/* Слайды лежат в ряд и едут трансформом: подменять контент на месте
+          нельзя, переход должен быть виден. Обрезаем по скруглению баннера. */}
+      <div className="absolute inset-0 overflow-hidden rounded-[16px]">
+        <div
+          className="flex h-full transition-transform duration-500 ease-out"
+          style={{ width: `${SLIDES.length * 100}%`, transform: `translateX(-${index * (100 / SLIDES.length)}%)` }}
+        >
+          {SLIDES.map((s) => (
+            <div
+              key={s.title}
+              className="flex h-full flex-col justify-center px-12 text-white"
+              style={{ width: `${100 / SLIDES.length}%` }}
+            >
+              <div className="text-[32px] font-extrabold leading-tight">{s.title}</div>
+              <div className="mt-2 text-[16px] font-semibold text-white/60">{s.note}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="absolute right-0 top-0 flex h-[40px] w-[90px] items-center justify-between rounded-[48px] border border-line-soft bg-surface p-1">

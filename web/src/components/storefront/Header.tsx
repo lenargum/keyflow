@@ -30,31 +30,41 @@ export function Header() {
   return (
     <header ref={ref} className="relative border-b border-page bg-white">
       <div className="mx-auto flex h-[80px] w-full max-w-[1200px] items-center gap-6">
+        {/* В макете шапка 80px, а все три элемента вписаны с отступом 22.5%
+            сверху и снизу — то есть ровно по 44px высотой. */}
         <button
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="flex shrink-0 items-center gap-2 rounded-[10px] bg-black px-5 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-85"
+          className="flex h-[44px] shrink-0 items-center gap-2 rounded-[10px] bg-black px-5 text-sm font-semibold text-white transition-opacity hover:opacity-85"
         >
           <img src="/figma/icon-catalog.svg" alt="" className="size-[20px]" />
           Каталог
         </button>
 
-        <div className="flex h-[36px] flex-1 items-center gap-2 rounded-[10px] bg-black p-1">
-          <div className="flex h-full flex-1 items-center rounded-[8px] bg-white px-3">
-            <span className="text-[12px] font-semibold tracking-[-0.36px] text-muted-dark">
+        <div className="flex h-[44px] flex-1 items-center gap-1 rounded-[10px] bg-black p-1">
+          {/* Избранное лежит ВНУТРИ белого инпута, у его правого края,
+              а лупа — снаружи, на чёрной подложке. */}
+          <div className="flex h-full flex-1 items-center gap-2 rounded-[8px] bg-white py-1 pl-3 pr-1">
+            <span className="flex-1 truncate text-[12px] font-semibold tracking-[-0.36px] text-muted-dark">
               Игра, приложение или услуга...
             </span>
+            <button
+              type="button"
+              className="flex size-[28px] shrink-0 items-center justify-center rounded-[6px] bg-surface-alt transition-colors hover:bg-line"
+            >
+              <img src="/figma/icon-favorite.svg" alt="Избранное" className="h-[13px] w-[14px]" />
+            </button>
           </div>
-          <span className="flex size-[28px] items-center justify-center rounded-[6px] bg-surface-alt">
-            <img src="/figma/icon-favorite.svg" alt="Избранное" className="h-[13px] w-[14px]" />
-          </span>
-          <span className="flex size-[28px] items-center justify-center">
-            <img src="/figma/icon-search.svg" alt="Поиск" className="size-[16px]" />
-          </span>
+          <button
+            type="button"
+            className="flex size-[36px] shrink-0 items-center justify-center rounded-[8px] transition-colors hover:bg-white/10"
+          >
+            <img src="/figma/icon-search.svg" alt="Поиск" className="size-[18px]" />
+          </button>
         </div>
 
-        <div className="flex size-[36px] shrink-0 items-center justify-center rounded-[10px] bg-page">
+        <div className="flex size-[44px] shrink-0 items-center justify-center rounded-[10px] bg-page">
           <span className="relative block size-[20px]">
             <img
               src="/figma/icon-profile-head.svg"

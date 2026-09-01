@@ -16,12 +16,19 @@ export function SteamTopUp() {
   const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>('$');
 
   return (
-    // Тот же приём, что и у ряда иконок: блок из макета не ужимается ниже 1100px.
-    <div className="overflow-x-auto pb-1">
+    // Тот же приём, что и у ряда иконок: блок из макета не ужимается ниже 1100px,
+    // а вертикальные отступы не дают скролл-контейнеру срезать тень у иконки Steam.
+    <div className="-my-2 overflow-x-auto px-0 pb-4 pt-4">
       <div className="grid min-w-[1100px] grid-cols-[285px_minmax(0,1fr)_minmax(0,1.2fr)_200px] items-center gap-4">
       <div className="flex items-center gap-3">
-        <span className="block size-[72px] shrink-0 overflow-hidden rounded-[16px] border-2 border-[#1482b3] shadow-icon">
+        {/* Обводка отдельным слоем — иначе border съедает 2px и картинка
+            перестаёт закрывать контейнер целиком. */}
+        <span className="relative block size-[72px] shrink-0 overflow-hidden rounded-[16px] shadow-icon">
           <img src="/figma/app-steam.png" alt="" className="size-full object-cover" />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-[16px] border-2 border-[#1482b3]"
+          />
         </span>
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">

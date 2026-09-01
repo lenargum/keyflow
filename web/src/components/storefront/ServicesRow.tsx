@@ -21,22 +21,32 @@ const SERVICES: Service[] = [
 export function ServicesRow() {
   // В макете у этого ряда overflow-auto: при нехватке ширины он скроллится,
   // а не ломается. Иконки фиксированные, ужимать их нельзя.
+  //
+  // overflow-x подразумевает и обрезку по вертикали — CSS не даёт сделать
+  // видимой только одну ось. Поэтому подъём и тень на ховере живут внутри
+  // собственных отступов контейнера, а отрицательные поля возвращают ряд
+  // на прежнее место.
   return (
-    <div className="-mx-1 flex min-w-full items-start justify-between gap-4 overflow-x-auto px-1 pb-1">
+    <div className="-mx-2 -my-2 flex min-w-full items-start justify-between gap-4 overflow-x-auto px-2 pb-6 pt-4">
       {SERVICES.map((service) => (
         <button
           key={service.name}
           type="button"
           className="group flex w-[76px] shrink-0 flex-col items-center gap-2"
         >
-          <span
-            className="block size-[72px] overflow-hidden rounded-[16px] border-2 shadow-icon transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-card-hover"
-            style={{ borderColor: service.ring }}
-          >
+          {/* Обводка нарисована отдельным слоем поверх картинки, а не border'ом
+              контейнера: border съедал бы по 2px с каждой стороны, картинка
+              становилась 68px вместо 72 и по краям светились белые поля. */}
+          <span className="relative block size-[72px] overflow-hidden rounded-[16px] shadow-icon transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-icon-hover">
             <img
               src={service.icon}
               alt=""
               className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-[16px] border-2"
+              style={{ borderColor: service.ring }}
             />
           </span>
           <span className="whitespace-nowrap text-[16px] font-bold tracking-[-0.16px] text-body transition-colors group-hover:text-ink">
@@ -46,7 +56,7 @@ export function ServicesRow() {
       ))}
 
       <button type="button" className="group flex w-[76px] shrink-0 flex-col items-center gap-2">
-        <span className="flex size-[72px] items-center justify-center rounded-[16px] border-2 border-line-strong bg-page shadow-icon transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-card-hover">
+        <span className="flex size-[72px] items-center justify-center rounded-[16px] border-2 border-line-strong bg-page shadow-icon transition-all duration-200 group-hover:-translate-y-1 group-hover:shadow-icon-hover">
           <img src="/figma/icon-more.svg" alt="" className="size-[28px]" />
         </span>
         <span className="whitespace-nowrap text-[16px] font-bold tracking-[-0.16px] text-muted">

@@ -32,6 +32,7 @@ export default {
         block: '0px 10px 34px 0px rgba(20,40,80,0.08)',
         card: '0px 11px 25px 0px rgba(20,40,80,0.1)',
         'card-hover': '0px 18px 34px 0px rgba(20,40,80,0.18)',
+        'icon-hover': '0px 8px 16px 0px rgba(20,40,80,0.28)',
       },
     },
   },
