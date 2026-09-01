@@ -36,6 +36,9 @@ export default {
         card: '0px 11px 25px 0px rgba(20,40,80,0.1)',
         'card-hover': '0px 18px 34px 0px rgba(20,40,80,0.18)',
         'icon-hover': '0px 8px 16px 0px rgba(20,40,80,0.28)',
+        // Дропдаун всплывает над пёстрым фоном — ему нужна тень поплотнее,
+        // чем мягкая shadow-block у карточек-подложек.
+        dropdown: '0px 12px 32px 0px rgba(20,40,80,0.22), 0px 2px 6px 0px rgba(20,40,80,0.12)',
       },
     },
   },

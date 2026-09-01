@@ -82,7 +82,7 @@ export function PromoField({
           <div
             ref={panelRef}
             style={{ top: box.top, left: box.left }}
-            className="fixed z-50 w-[280px] rounded-xl bg-white p-3 shadow-block"
+            className="fixed z-50 w-[280px] rounded-xl border border-line bg-white p-3 shadow-dropdown"
           >
           <label htmlFor="promo" className="text-[12px] font-bold text-muted">
             Промокод применится к заказу

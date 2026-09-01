@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 /**
  * Блок пополнения Steam, часть ноды макета 1:494.
@@ -124,35 +124,36 @@ function CurrencyBadge({ currency }: { currency: Currency }) {
   );
 }
 
-/** Ширина поля едет за содержимым, чтобы символ валюты стоял вплотную к сумме. */
+/**
+ * Ширина поля едет за содержимым, чтобы символ валюты стоял вплотную к сумме.
+ *
+ * Ширину задаёт скрытый span с ТЕМИ ЖЕ классами, а инпут растянут поверх него.
+ * Мерить через getComputedStyle оказалось ненадёжно: у инпута tabular-nums,
+ * знакоместа шире пропорциональных цифр, и символ валюты наезжал на сумму.
+ * Здесь совпадение шрифта гарантировано — это буквально те же классы.
+ */
 function AmountInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const ref = useRef<HTMLInputElement>(null);
-  const [width, setWidth] = useState(0);
-
-  useEffect(() => {
-    // Меряем настоящим span'ом, а не ch: у Montserrat цифры уже знакоместа.
-    const probe = document.createElement('span');
-    probe.style.cssText =
-      'position:absolute;visibility:hidden;white-space:pre;font:inherit;letter-spacing:inherit';
-    probe.textContent = value || '0';
-    ref.current?.parentElement?.appendChild(probe);
-    setWidth(probe.getBoundingClientRect().width);
-    probe.remove();
-  }, [value]);
+  const text = value || '0';
 
   return (
-    <input
-      id="topup-amount"
-      ref={ref}
-      value={value}
-      inputMode="numeric"
-      aria-label="Сумма пополнения"
-      onChange={(e) => {
-        const digits = e.target.value.replace(/\D/g, '').slice(0, MAX_AMOUNT_CHARS);
-        onChange(digits.replace(/^0+(?=\d)/, ''));
-      }}
-      style={{ width: `${Math.max(width, 8)}px` }}
-      className="bg-transparent font-bold tabular-nums text-body outline-none"
-    />
+    <span className="relative inline-block">
+      <span aria-hidden className={`invisible whitespace-pre ${AMOUNT_TEXT}`}>
+        {text}
+      </span>
+      <input
+        id="topup-amount"
+        value={value}
+        inputMode="numeric"
+        aria-label="Сумма пополнения"
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, '').slice(0, MAX_AMOUNT_CHARS);
+          onChange(digits.replace(/^0+(?=\d)/, ''));
+        }}
+        className={`absolute inset-0 w-full bg-transparent outline-none ${AMOUNT_TEXT}`}
+      />
+    </span>
   );
 }
+
+/** Один источник правды для шрифта: и мерная копия, и сам инпут. */
+const AMOUNT_TEXT = 'font-bold tabular-nums text-body';

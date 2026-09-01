@@ -19,7 +19,12 @@ export function ProductCard({
   onBuy: (sku: string) => void;
 }) {
   return (
-    <article className="flex flex-col overflow-hidden rounded-[16px] bg-white shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover">
+    // Вся карточка кликабельна: действие у неё одно, и курсор-указатель
+    // не должен обманывать — раз он появился, клик должен срабатывать.
+    <article
+      onClick={() => !busy && onBuy(product.sku)}
+      className="flex cursor-pointer flex-col overflow-hidden rounded-[16px] bg-white shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover"
+    >
       <img src="/figma/product-pubg.png" alt="" className="h-[152px] w-full object-cover" />
 
       <div className="flex flex-1 flex-col gap-3 px-[13px] pb-[15px] pt-[12px]">
@@ -34,7 +39,10 @@ export function ProductCard({
 
         <button
           type="button"
-          onClick={() => onBuy(product.sku)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onBuy(product.sku);
+          }}
           disabled={busy}
           className="mt-auto h-[42px] rounded-[11px] bg-black text-[12px] font-extrabold text-white transition-opacity hover:opacity-85 disabled:opacity-40"
         >
